@@ -2,9 +2,13 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Outil d'aide à la mutation - Collèges Haute-Savoie depuis Fillinges</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mutation Collèges 74 — Aide à la décision</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
         :root {
             --green: #22c55e;
             --yellow: #eab308;
@@ -12,1068 +16,1307 @@
             --red: #ef4444;
             --blue: #3b82f6;
             --purple: #8b5cf6;
-            --bg: #0f172a;
-            --card: #1e293b;
-            --card-hover: #273548;
-            --text: #e2e8f0;
-            --muted: #94a3b8;
-            --border: #334155;
+            --cyan: #06b6d4;
+            --bg: #0a0a0f;
+            --bg-elevated: #111118;
+            --card: rgba(255,255,255,0.04);
+            --card-hover: rgba(255,255,255,0.07);
+            --card-border: rgba(255,255,255,0.08);
+            --card-border-hover: rgba(255,255,255,0.15);
+            --glass: rgba(255,255,255,0.03);
+            --text: #eef0f2;
+            --text-secondary: #b0b7be;
+            --text-muted: #6b7280;
+            --surface: rgba(255,255,255,0.06);
+            --radius: 16px;
+            --radius-sm: 10px;
+            --radius-xs: 6px;
+            --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
+
         * { box-sizing: border-box; margin: 0; padding: 0; }
+
         body {
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
             background: var(--bg);
             color: var(--text);
-            line-height: 1.6;
-            padding: 10px;
-            font-size: 14px;
-            -webkit-text-size-adjust: 100%;
+            line-height: 1.5;
+            overflow: hidden;
+            height: 100dvh;
+            -webkit-font-smoothing: antialiased;
         }
-        .header {
-            text-align: center;
-            padding: 20px 14px;
-            background: linear-gradient(135deg, #1e3a5f 0%, #2d1b69 100%);
-            border-radius: 12px;
-            margin-bottom: 16px;
+
+        .app {
+            display: flex;
+            flex-direction: column;
+            height: 100dvh;
         }
-        .header h1 { font-size: 1.3em; margin-bottom: 6px; }
-        .header .subtitle { color: var(--muted); font-size: 0.82em; }
-        .header .origin {
-            display: inline-block;
-            background: rgba(59,130,246,0.2);
-            border: 1px solid rgba(59,130,246,0.3);
-            padding: 6px 12px;
-            border-radius: 8px;
-            margin-top: 10px;
-            font-size: 0.78em;
+
+        .app-header { display: none; }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
         }
-        @media (min-width: 768px) {
-            body { padding: 20px; font-size: 16px; }
-            .header { padding: 30px 20px; border-radius: 16px; margin-bottom: 24px; }
-            .header h1 { font-size: 1.8em; }
-            .header .subtitle { font-size: 0.95em; }
-            .header .origin { font-size: 0.9em; }
+
+        .map-container {
+            height: 40dvh;
+            min-height: 200px;
+            position: relative;
+            flex-shrink: 0;
+            border-bottom: 1px solid var(--card-border);
         }
-        .info-banner {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 14px;
-            margin-bottom: 16px;
-        }
-        .info-banner h3 { color: var(--blue); margin-bottom: 8px; font-size: 0.95em; }
-        .info-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 8px;
-        }
-        .info-item {
-            background: rgba(59,130,246,0.1);
-            border-radius: 8px;
-            padding: 10px;
-            font-size: 0.85em;
-        }
-        .info-item strong { color: var(--blue); }
-        @media (min-width: 768px) {
-            .info-banner { padding: 20px; margin-bottom: 24px; border-radius: 12px; }
-            .info-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
-            .info-item { font-size: 1em; padding: 12px; }
-        }
-        .controls {
+
+        #map { width: 100%; height: 100%; z-index: 1; }
+
+        .map-controls {
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            z-index: 1000;
+            background: rgba(8,8,12,0.93);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-top: 1px solid rgba(255,255,255,0.1);
+            padding: 12px 18px;
             display: flex;
             flex-direction: column;
             gap: 10px;
-            margin-bottom: 16px;
         }
-        .controls label { color: var(--muted); font-size: 0.82em; }
-        select, input[type="range"] {
-            background: var(--card);
-            color: var(--text);
-            border: 1px solid var(--border);
-            padding: 10px 12px;
-            border-radius: 8px;
-            font-size: 1em;
-            width: 100%;
-            min-height: 44px;
-        }
-        .filter-group { display: flex; flex-direction: column; gap: 4px; }
-        @media (min-width: 768px) {
-            .controls { flex-direction: row; align-items: center; gap: 12px; margin-bottom: 24px; }
-            select, input[type="range"] { width: auto; font-size: 0.9em; padding: 8px 12px; min-height: auto; }
-        }
-        .btn-group { display: flex; gap: 6px; flex-wrap: wrap; }
-        .btn {
-            padding: 8px 14px;
-            border-radius: 20px;
-            border: 1px solid var(--border);
-            background: var(--card);
-            color: var(--text);
-            cursor: pointer;
-            font-size: 0.82em;
-            transition: all 0.2s;
-            min-height: 36px;
-            touch-action: manipulation;
-        }
-        .btn:hover { background: var(--card-hover); }
-        .btn.active { background: var(--blue); border-color: var(--blue); color: white; }
-        .btn.active-green { background: var(--green); border-color: var(--green); color: white; }
-        .btn.active-orange { background: var(--orange); border-color: var(--orange); color: white; }
 
-        .college-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 16px;
+        .ctrl-row {
+            display: flex; align-items: center;
+            gap: 10px; flex-wrap: wrap;
         }
+
+        .ctrl-section {
+            display: flex; align-items: center; gap: 6px;
+        }
+
+        .ctrl-label {
+            font-size: 0.9em; color: var(--text-muted);
+            text-transform: uppercase; letter-spacing: 0.06em;
+            font-weight: 700; white-space: nowrap;
+            padding-right: 2px;
+        }
+
+        .ctrl-sep {
+            width: 1px; height: 20px; background: rgba(255,255,255,0.1);
+            margin: 0 2px; flex-shrink: 0;
+        }
+
+        .ctrl-legend {
+            display: flex; align-items: center; gap: 8px;
+            margin-right: auto;
+        }
+
+        .legend-item {
+            display: flex; align-items: center; gap: 4px;
+            font-size: 0.9em; color: var(--text-secondary); white-space: nowrap;
+            cursor: pointer; padding: 5px 10px; border-radius: 14px;
+            border: 1px solid transparent; transition: var(--transition);
+            user-select: none;
+        }
+        .legend-item:hover { background: rgba(255,255,255,0.08); }
+        .legend-item.active { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.25); color: var(--text); font-weight: 600; }
+        .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+        .map-controls .filter-pills { display: flex; gap: 4px; flex-wrap: wrap; }
+
+        .map-controls .result-count {
+            font-size: 1.0em; color: var(--text-muted);
+            white-space: nowrap;
+        }
+
+        .marker-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            font-weight: 700;
+            color: #fff;
+            border: 2px solid rgba(255,255,255,0.3);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            transition: transform 0.2s ease;
+            cursor: pointer;
+        }
+
+        .marker-icon:hover { transform: scale(1.2); z-index: 1000 !important; }
+
+        .marker-icon.active {
+            transform: scale(1.3);
+            border-color: #fff;
+            box-shadow: 0 0 16px rgba(59,130,246,0.6);
+        }
+
+        .marker-top {
+            position: relative;
+            border: 3px solid;
+        }
+        .marker-top .medal-badge {
+            position: absolute;
+            top: -8px; left: -8px;
+            font-size: 18px; line-height: 1;
+            filter: drop-shadow(0 1px 3px rgba(0,0,0,0.7));
+            z-index: 10;
+        }
+        .marker-top.top-1 { border-color: #fbbf24; box-shadow: 0 0 20px rgba(251,191,36,0.5); }
+        .marker-top.top-2 { border-color: #94a3b8; box-shadow: 0 0 16px rgba(148,163,184,0.4); }
+        .marker-top.top-3 { border-color: #d97706; box-shadow: 0 0 16px rgba(217,119,6,0.4); }
+
+        .marker-home {
+            width: 40px; height: 40px;
+            background: linear-gradient(135deg, var(--blue), var(--purple));
+            font-size: 18px;
+            border: 3px solid rgba(255,255,255,0.5);
+            box-shadow: 0 0 20px rgba(59,130,246,0.4);
+            animation: pulse-home 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-home {
+            0%, 100% { box-shadow: 0 0 20px rgba(59,130,246,0.4); }
+            50% { box-shadow: 0 0 30px rgba(59,130,246,0.7); }
+        }
+
+        .marker-green { background: var(--green); }
+        .marker-yellow { background: var(--yellow); color: #1a1a1a; }
+        .marker-orange { background: var(--orange); }
+        .marker-red { background: var(--red); }
+        .marker-ref { background: #64748b; opacity: 0.7; }
+
+        .leaflet-popup-content-wrapper {
+            background: rgba(17,17,24,0.95);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--card-border);
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        }
+
+        .leaflet-popup-tip { background: rgba(17,17,24,0.95); }
+
+        .leaflet-popup-content {
+            font-family: 'Inter', system-ui, sans-serif;
+            font-size: 13px;
+            line-height: 1.5;
+            margin: 12px 14px;
+        }
+
+        .popup-name { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+        .popup-commune { color: var(--text-secondary); font-size: 12px; margin-bottom: 8px; }
+        .popup-stat { display: flex; justify-content: space-between; padding: 3px 0; font-size: 12px; }
+        .popup-stat span:first-child { color: var(--text-secondary); }
+        .popup-link {
+            display: inline-block; margin-top: 8px; color: var(--blue);
+            text-decoration: none; font-size: 12px; font-weight: 500; cursor: pointer;
+        }
+
+        .list-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: var(--bg);
+        }
+
+        select, input[type="range"] { font-family: inherit; }
+
+        .select-styled {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.18);
+            color: var(--text);
+            padding: 7px 10px;
+            border-radius: 20px;
+            font-size: 1.05em;
+            font-family: inherit;
+            cursor: pointer;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23b0b7be'%3E%3Cpath d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            padding-right: 24px;
+        }
+
+        .pill {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.18);
+            color: var(--text);
+            padding: 7px 14px;
+            border-radius: 20px;
+            font-size: 1.1em;
+            font-weight: 500;
+            font-family: inherit;
+            cursor: pointer;
+            transition: var(--transition);
+            white-space: nowrap;
+        }
+
+        .pill:hover { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.25); }
+        .pill.active { font-weight: 600; }
+        .pill.active[data-filter="all"] { background: rgba(59,130,246,0.3); border-color: rgba(59,130,246,0.5); color: #93c5fd; }
+        .pill.active[data-filter="rep"] { background: rgba(249,115,22,0.3); border-color: rgba(249,115,22,0.5); color: #fdba74; }
+        .pill.active[data-filter="no-toll"] { background: rgba(34,197,94,0.3); border-color: rgba(34,197,94,0.5); color: #86efac; }
+        .pill.active[data-filter="small"] { background: rgba(6,182,212,0.3); border-color: rgba(6,182,212,0.5); color: #67e8f9; }
+        .pill.active[data-filter="ulis"] { background: rgba(139,92,246,0.3); border-color: rgba(139,92,246,0.5); color: #c4b5fd; }
+        .pill.active[data-filter="segpa"] { background: rgba(236,72,153,0.3); border-color: rgba(236,72,153,0.5); color: #f9a8d4; }
+        .pill.active[data-filter="cheap"] { background: rgba(234,179,8,0.3); border-color: rgba(234,179,8,0.5); color: #fde68a; }
+        .pill .pill-icon { margin-right: 4px; font-size: 0.7em; }
+        .pill[data-filter="rep"] .pill-icon { color: var(--orange); }
+        .pill[data-filter="no-toll"] .pill-icon { color: var(--green); }
+        .pill[data-filter="small"] .pill-icon { color: var(--cyan); }
+        .pill[data-filter="ulis"] .pill-icon { color: var(--purple); }
+        .pill[data-filter="segpa"] .pill-icon { color: #ec4899; }
+        .pill[data-filter="cheap"] .pill-icon { color: var(--yellow); }
+        .pill .pill-x {
+            display: none;
+            margin-left: 5px;
+            font-size: 0.85em;
+            opacity: 0.8;
+        }
+        .pill.active:not([data-filter="all"]) .pill-x { display: inline; }
+
+        .time-slider { display: flex; align-items: center; gap: 6px; }
+        .time-slider input[type="range"] { width: 80px; accent-color: var(--blue); height: 4px; }
+        .time-slider .time-val { font-size: 1.05em; font-weight: 700; color: #93c5fd; min-width: 40px; }
+
+        .cards-scroll {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            scroll-behavior: smooth;
+        }
+
+        .cards-scroll::-webkit-scrollbar { width: 4px; }
+        .cards-scroll::-webkit-scrollbar-track { background: transparent; }
+        .cards-scroll::-webkit-scrollbar-thumb { background: var(--card-border); border-radius: 4px; }
+
         .college-card {
             background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 14px;
-            transition: all 0.3s;
+            border: 1px solid var(--card-border);
+            border-radius: var(--radius);
+            margin-bottom: 16px;
+            transition: var(--transition), transform 0.2s ease, box-shadow 0.2s ease;
+            overflow: hidden;
+            cursor: pointer;
             position: relative;
         }
-        @media (min-width: 768px) {
-            .college-card { padding: 20px; border-radius: 12px; }
-            .college-card:hover {
-                border-color: var(--blue);
-                transform: translateY(-2px);
-                box-shadow: 0 8px 24px rgba(0,0,0,0.3);
-            }
+
+        .college-card:hover { background: var(--card-hover); border-color: var(--card-border-hover); }
+        .college-card.highlighted { border-color: rgba(59,130,246,0.5); box-shadow: 0 0 20px rgba(59,130,246,0.15); }
+        .college-card.is-reference { border-color: rgba(239,68,68,0.3); background: rgba(239,68,68,0.04); }
+        .college-card.selected { border-color: rgba(139,92,246,0.5); box-shadow: 0 0 20px rgba(139,92,246,0.15); }
+
+        .card-header { display: flex; align-items: flex-start; justify-content: space-between; padding: 20px 20px 12px; gap: 12px; }
+        .card-left { flex: 1; min-width: 0; }
+
+        .card-rank-inline {
+            font-size: 1.05em; font-weight: 800; letter-spacing: 0.04em;
+            display: flex; align-items: center; gap: 5px; margin-bottom: 4px;
         }
-        .college-card.recommended {
-            border-color: var(--green);
-            box-shadow: 0 0 20px rgba(34,197,94,0.15);
+        .card-rank-inline.rank-1 { color: #fbbf24; }
+        .card-rank-inline.rank-2 { color: #94a3b8; }
+        .card-rank-inline.rank-3 { color: #d97706; }
+
+        .college-card.top-1 { border-top: 3px solid #fbbf24; background: rgba(251,191,36,0.04); }
+        .college-card.top-2 { border-top: 3px solid #94a3b8; background: rgba(148,163,184,0.03); }
+        .college-card.top-3 { border-top: 3px solid #d97706; background: rgba(217,119,6,0.03); }
+
+        .card-name { font-weight: 700; font-size: 1.34em; letter-spacing: -0.01em; }
+        .card-commune { font-size: 1.1em; color: var(--text-secondary); margin-top: 3px; }
+
+        .card-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+
+        .score-circle {
+            width: 48px; height: 48px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 800; font-size: 1.05em; border: 2px solid;
         }
-        .college-card.top-pick::before {
-            content: attr(data-rank);
-            position: absolute;
-            top: -10px;
-            right: 16px;
-            background: var(--green);
-            color: white;
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 0.75em;
-            font-weight: bold;
-        }
-        .college-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 12px;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-        .college-name { font-size: 1em; font-weight: 700; }
-        .college-commune { color: var(--muted); font-size: 0.78em; }
-        @media (min-width: 768px) {
-            .college-name { font-size: 1.15em; }
-            .college-commune { font-size: 0.85em; }
-        }
-        .badges { display: flex; gap: 6px; flex-wrap: wrap; }
+
+        .card-badges { display: flex; gap: 3px; flex-wrap: wrap; justify-content: flex-end; }
+
         .badge {
-            padding: 3px 10px;
-            border-radius: 12px;
-            font-size: 0.7em;
-            font-weight: 600;
-            text-transform: uppercase;
+            font-size: 0.86em; font-weight: 600; padding: 3px 8px;
+            border-radius: 10px; text-transform: uppercase; letter-spacing: 0.04em;
         }
+
         .badge-rep { background: rgba(249,115,22,0.2); color: var(--orange); border: 1px solid rgba(249,115,22,0.3); }
-        .badge-rep-plus { background: rgba(239,68,68,0.2); color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
-        .badge-standard { background: rgba(59,130,246,0.15); color: var(--blue); border: 1px solid rgba(59,130,246,0.2); }
-        .badge-segpa { background: rgba(139,92,246,0.2); color: var(--purple); border: 1px solid rgba(139,92,246,0.3); }
-        .badge-ulis { background: rgba(236,72,153,0.2); color: #ec4899; border: 1px solid rgba(236,72,153,0.3); }
+        .badge-segpa { background: rgba(139,92,246,0.15); color: var(--purple); border: 1px solid rgba(139,92,246,0.25); }
+        .badge-ulis { background: rgba(6,182,212,0.15); color: var(--cyan); border: 1px solid rgba(6,182,212,0.25); }
+        .badge-ref { background: rgba(239,68,68,0.15); color: var(--red); border: 1px solid rgba(239,68,68,0.25); }
 
-        .metrics {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 8px;
-            margin-bottom: 12px;
-        }
-        .metric {
-            background: rgba(255,255,255,0.03);
-            border-radius: 8px;
-            padding: 8px;
-        }
-        .metric-label { font-size: 0.65em; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
-        .metric-value { font-size: 1em; font-weight: 700; margin-top: 2px; }
-        .metric-detail { font-size: 0.7em; color: var(--muted); }
-        @media (min-width: 768px) {
-            .metrics { grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
-            .metric { padding: 10px; }
-            .metric-label { font-size: 0.7em; }
-            .metric-value { font-size: 1.1em; }
-            .metric-detail { font-size: 0.75em; }
+        .card-quick-stats { display: flex; padding: 8px 20px 18px; gap: 16px; font-size: 1.1em; }
+        .quick-stat { display: flex; align-items: center; gap: 5px; color: var(--text-secondary); }
+        .quick-stat .val { font-weight: 600; color: var(--text); }
+        .quick-stat .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+        .compare-check {
+            position: absolute; top: 10px; right: 10px;
+            width: 20px; height: 20px; border-radius: 50%;
+            border: 2px solid var(--card-border);
+            background: transparent; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: var(--transition); z-index: 5; opacity: 0;
         }
 
-        .trajet-section {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 8px;
-            margin-top: 10px;
+        .college-card:hover .compare-check, .college-card.selected .compare-check { opacity: 1; }
+        .compare-check.checked { opacity: 1; background: var(--purple); border-color: var(--purple); }
+
+        .detail-panel {
+            flex: 1; overflow-y: auto; padding: 20px;
+            background: var(--bg); display: none;
         }
-        @media (min-width: 480px) {
-            .trajet-section { grid-template-columns: 1fr 1fr; gap: 10px; }
+        .detail-panel.visible { display: block; }
+        .detail-panel::-webkit-scrollbar { width: 4px; }
+        .detail-panel::-webkit-scrollbar-track { background: transparent; }
+        .detail-panel::-webkit-scrollbar-thumb { background: var(--card-border); border-radius: 4px; }
+
+        .detail-back {
+            display: inline-flex; align-items: center; gap: 6px;
+            font-size: 1.1em; color: var(--blue); cursor: pointer;
+            padding: 4px 0 14px; font-weight: 600; border: none; background: none;
+            font-family: inherit;
         }
-        .trajet-box {
-            background: rgba(255,255,255,0.03);
-            border-radius: 8px;
-            padding: 10px;
+        .detail-back:hover { opacity: 0.8; }
+
+        .detail-hero {
+            display: flex; justify-content: space-between; align-items: flex-start;
+            margin-bottom: 20px;
         }
-        .trajet-box h4 { font-size: 0.8em; color: var(--muted); margin-bottom: 6px; }
-        .trajet-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 3px 0;
-            font-size: 0.85em;
+        .detail-hero .detail-name { font-size: 1.55em; font-weight: 800; letter-spacing: -0.02em; }
+        .detail-hero .detail-commune { font-size: 1.14em; color: var(--text-secondary); margin-top: 3px; }
+        .detail-hero .score-circle { width: 58px; height: 58px; font-size: 1.3em; flex-shrink: 0; }
+
+        .detail-badges { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+        .detail-badges .badge { font-size: 0.9em; padding: 5px 12px; }
+
+        .detail-quick-grid {
+            display: grid; grid-template-columns: repeat(4, 1fr);
+            gap: 10px; margin-bottom: 22px;
         }
-        .trajet-time { font-weight: 700; }
+        .detail-quick-item {
+            background: var(--surface); border-radius: var(--radius-xs);
+            padding: 14px 8px; text-align: center;
+        }
+        .detail-quick-item .dq-label { font-size: 0.86em; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; }
+        .detail-quick-item .dq-value { font-size: 1.26em; font-weight: 700; }
+
+        .details-inner { padding: 4px 0 20px; }
+
+        .detail-section {
+            background: var(--surface); border-radius: var(--radius-sm);
+            padding: 16px 18px; margin-bottom: 14px;
+            border-left: 3px solid transparent;
+        }
+
+        .detail-section h4 {
+            font-size: 1.0em; font-weight: 600; color: var(--text-muted);
+            text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;
+            display: flex; align-items: center; gap: 6px;
+        }
+
+        .section-trajet { border-left-color: var(--blue); }
+        .section-couts { border-left-color: var(--yellow); }
+        .section-etab { border-left-color: var(--purple); }
+        .section-pros { border-left-color: var(--green); background: rgba(34,197,94,0.04); }
+        .section-cons { border-left-color: var(--red); background: rgba(239,68,68,0.04); }
+        .section-english { border-left-color: #3b82f6; background: rgba(59,130,246,0.06); }
+        .section-notes { border-left-color: rgba(255,255,255,0.15); }
+
+        .trajet-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .trajet-item { text-align: center; }
+        .trajet-label { font-size: 0.94em; color: var(--text-muted); margin-bottom: 2px; }
+        .trajet-value { font-size: 1.44em; font-weight: 700; }
+        .trajet-sub { font-size: 0.9em; color: var(--text-muted); margin-top: 1px; }
+
         .time-green { color: var(--green); }
         .time-yellow { color: var(--yellow); }
         .time-orange { color: var(--orange); }
         .time-red { color: var(--red); }
 
-        .cost-section {
-            margin-top: 10px;
-            background: rgba(255,255,255,0.03);
-            border-radius: 8px;
-            padding: 12px;
-        }
-        .cost-section h4 { font-size: 0.8em; color: var(--muted); margin-bottom: 8px; }
-        .cost-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 8px;
-        }
-        @media (min-width: 480px) {
-            .cost-grid { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
-        }
-        .cost-item { text-align: center; }
-        .cost-value { font-size: 1em; font-weight: 700; }
-        .cost-label { font-size: 0.7em; color: var(--muted); }
+        .cost-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 1.05em; border-bottom: 1px solid rgba(255,255,255,0.03); }
+        .cost-row:last-child { border-bottom: none; }
+        .cost-row .label { color: var(--text-secondary); flex-shrink: 0; }
+        .cost-row .value { font-weight: 600; text-align: right; }
 
-        .score-bar {
-            width: 100%;
-            height: 8px;
-            background: rgba(255,255,255,0.1);
-            border-radius: 4px;
-            overflow: hidden;
-            margin-top: 10px;
-        }
-        .score-fill {
-            height: 100%;
-            border-radius: 4px;
-            transition: width 0.5s;
+        .info-block { padding: 6px 0; }
+        .info-block .info-label { font-size: 0.94em; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 3px; }
+        .info-block .info-value { font-size: 1.05em; color: var(--text-secondary); line-height: 1.5; }
+
+        .rep-bonus {
+            margin-top: 8px; padding: 8px 10px;
+            background: rgba(249,115,22,0.1); border: 1px solid rgba(249,115,22,0.2);
+            border-radius: var(--radius-xs); font-size: 1.0em; color: var(--orange);
         }
 
-        .summary-section {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 20px;
-            margin-top: 24px;
+        .reason-list { list-style: none; padding: 0; margin: 0; }
+        .reason-item {
+            display: flex; align-items: flex-start; gap: 8px;
+            padding: 5px 0; font-size: 1.05em; line-height: 1.4;
         }
-        .summary-section h2 { color: var(--green); margin-bottom: 16px; }
-        .voeu-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 10px;
-            background: rgba(255,255,255,0.03);
-            border-radius: 8px;
-            margin-bottom: 8px;
-        }
-        .voeu-rank {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            font-size: 1em;
-            flex-shrink: 0;
-        }
-        @media (min-width: 768px) {
-            .voeu-item { gap: 12px; padding: 12px; }
-            .voeu-rank { width: 36px; height: 36px; font-size: 1.1em; }
-        }
-        .voeu-1 { background: #ffd700; color: #000; }
-        .voeu-2 { background: #c0c0c0; color: #000; }
-        .voeu-3 { background: #cd7f32; color: #fff; }
-        .voeu-other { background: var(--border); color: var(--text); }
-        .voeu-info { flex: 1; }
-        .voeu-name { font-weight: 700; font-size: 0.9em; }
-        .voeu-reason { font-size: 0.72em; color: var(--muted); }
-        .voeu-score { font-weight: 700; font-size: 1.1em; }
-        @media (min-width: 768px) {
-            .voeu-name { font-size: 1em; }
-            .voeu-reason { font-size: 0.8em; }
-            .voeu-score { font-size: 1.2em; }
+        .reason-item + .reason-item { border-top: 1px solid rgba(255,255,255,0.03); }
+        .reason-icon { font-size: 1em; flex-shrink: 0; width: 20px; text-align: center; }
+        .reason-text { color: var(--text-secondary); }
+        .reason-item.pro .reason-text { color: rgba(134,239,172,0.9); }
+        .reason-item.con .reason-text { color: rgba(252,165,165,0.85); }
+        .reason-item.english { background: rgba(59,130,246,0.08); border-radius: var(--radius-xs); padding: 6px 8px; margin: 2px -4px; }
+        .reason-item.english .reason-text { color: rgba(147,197,253,0.95); font-weight: 500; }
+        .english-tag {
+            display: inline-flex; align-items: center; gap: 4px;
+            font-size: 0.9em; font-weight: 600; padding: 2px 8px;
+            border-radius: 10px; background: rgba(59,130,246,0.15);
+            color: var(--blue); border: 1px solid rgba(59,130,246,0.25);
+            margin-left: 4px; vertical-align: middle;
         }
 
-        .legend {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 16px;
-            padding: 12px;
-            background: rgba(255,255,255,0.03);
-            border-radius: 8px;
-            margin-bottom: 16px;
-            font-size: 0.8em;
+        .notes-text { font-size: 1.05em; color: var(--text-secondary); line-height: 1.6; }
+
+        .card-links { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+
+        .card-link {
+            display: inline-flex; align-items: center; gap: 4px;
+            font-size: 0.94em; color: var(--blue); text-decoration: none;
+            padding: 6px 14px;
+            background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.2);
+            border-radius: 20px; transition: var(--transition);
         }
-        .legend-item { display: flex; align-items: center; gap: 6px; }
-        .legend-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
+
+        .card-link:hover { background: rgba(59,130,246,0.2); border-color: rgba(59,130,246,0.4); }
+
+        .expand-indicator { display: none; }
+
+        .compare-bar {
+            position: fixed; bottom: -70px; left: 0; right: 0;
+            background: rgba(17,17,24,0.95);
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border-top: 1px solid rgba(139,92,246,0.3);
+            padding: 12px 16px;
+            display: flex; align-items: center; justify-content: space-between;
+            z-index: 200;
+            transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
+
+        .compare-bar.visible { bottom: 0; }
+        .compare-bar .compare-info { font-size: 0.94em; color: var(--text-secondary); }
+        .compare-bar .compare-info strong { color: var(--purple); }
+
+        .compare-btn {
+            background: linear-gradient(135deg, var(--purple), var(--blue));
+            color: #fff; border: none; padding: 8px 20px;
+            border-radius: 20px; font-size: 0.94em; font-weight: 600;
+            font-family: inherit; cursor: pointer; transition: var(--transition);
+        }
+
+        .compare-btn:hover { opacity: 0.9; transform: scale(1.02); }
+
+        .compare-reset {
+            background: none; border: 1px solid var(--card-border);
+            color: var(--text-secondary); padding: 8px 14px;
+            border-radius: 20px; font-size: 0.86em; font-family: inherit;
+            cursor: pointer; margin-left: 8px;
+        }
+
+        .compare-modal {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+            z-index: 300; display: none;
+            align-items: flex-end; justify-content: center;
+        }
+
+        .compare-modal.open { display: flex; }
+
+        .compare-sheet {
+            background: var(--bg-elevated);
+            border: 1px solid var(--card-border);
+            border-radius: var(--radius) var(--radius) 0 0;
+            width: 100%; max-width: 700px; max-height: 80dvh;
+            overflow-y: auto; padding: 20px;
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+        .compare-sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .compare-sheet-header h2 { font-size: 1em; font-weight: 700; }
+
+        .close-sheet {
+            background: var(--surface); border: 1px solid var(--card-border);
+            color: var(--text); width: 32px; height: 32px; border-radius: 50%;
+            font-size: 16px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        .compare-grid { display: grid; gap: 1px; background: var(--card-border); border-radius: var(--radius-sm); overflow: hidden; }
+        .compare-row { display: grid; background: var(--bg); }
+        .compare-row.header-row { background: var(--bg-elevated); font-weight: 700; font-size: 0.94em; position: sticky; top: 0; }
+
+        .compare-cell {
+            padding: 8px 12px; font-size: 0.9em; text-align: center;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        .compare-cell:first-child { text-align: left; justify-content: flex-start; color: var(--text-secondary); font-weight: 500; }
+        .compare-cell.best { color: var(--green); font-weight: 700; }
+
+        .legend-bar { display: none; }
 
         .disclaimer {
-            margin-top: 24px;
-            padding: 16px;
-            background: rgba(249,115,22,0.1);
-            border: 1px solid rgba(249,115,22,0.2);
-            border-radius: 8px;
-            font-size: 0.8em;
-            color: var(--muted);
-        }
-        .disclaimer strong { color: var(--orange); }
-
-        .current-badge {
-            display: inline-block;
-            background: rgba(239,68,68,0.2);
-            border: 1px solid rgba(239,68,68,0.3);
-            color: var(--red);
-            padding: 2px 8px;
-            border-radius: 8px;
-            font-size: 0.7em;
-            margin-left: 8px;
+            padding: 10px 14px; font-size: 0.62em; color: #4b5563;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            background: #050508; line-height: 1.6;
         }
 
-        .comparison-ref {
-            background: rgba(239,68,68,0.08);
-            border: 1px dashed rgba(239,68,68,0.3);
-        }
-
-        .tab-container {
-            display: flex;
-            gap: 2px;
-            margin-bottom: 14px;
-            border-bottom: 2px solid var(--border);
-            padding-bottom: 0;
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-        }
-        .tab {
-            padding: 10px 12px;
-            cursor: pointer;
-            border-radius: 8px 8px 0 0;
-            background: transparent;
-            color: var(--muted);
-            border: 1px solid transparent;
-            border-bottom: none;
-            font-size: 0.8em;
-            transition: all 0.2s;
-            white-space: nowrap;
-            min-height: 44px;
-            touch-action: manipulation;
-        }
-        .tab:hover { color: var(--text); background: rgba(255,255,255,0.05); }
-        .tab.active {
-            color: var(--blue);
-            background: var(--card);
-            border-color: var(--border);
-            font-weight: 600;
-        }
         @media (min-width: 768px) {
-            .tab-container { gap: 4px; margin-bottom: 20px; }
-            .tab { padding: 10px 20px; font-size: 0.9em; }
+            .main-content { flex-direction: row; }
+            .map-container { width: 70%; height: auto; min-height: unset; border-bottom: none; border-right: 1px solid var(--card-border); }
+            .list-panel { width: 30%; }
+            .compare-check { opacity: 0.5; }
+            .compare-sheet { max-height: 85dvh; border-radius: var(--radius); margin: auto; }
+            .compare-modal { align-items: center; }
+            .map-controls { padding: 14px 22px; gap: 10px; }
         }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
 
-        .hidden { display: none !important; }
+        .leaflet-control-zoom a { background: rgba(17,17,24,0.9) !important; color: var(--text) !important; border-color: var(--card-border) !important; }
+        .leaflet-control-attribution { background: rgba(17,17,24,0.7) !important; color: var(--text-muted) !important; font-size: 9px !important; }
+        .leaflet-control-attribution a { color: var(--text-secondary) !important; }
 
-        table.compare-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.68em;
-            white-space: nowrap;
+        /* ── Loading screen ── */
+        .loading-screen {
+            position: fixed; inset: 0; z-index: 9999;
+            background: var(--bg);
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            transition: opacity 0.6s ease, visibility 0.6s ease;
         }
-        table.compare-table th, table.compare-table td {
-            padding: 6px 5px;
-            border: 1px solid var(--border);
-            text-align: center;
+        .loading-screen.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+        .loading-logo {
+            width: 64px; height: 64px; border-radius: 50%;
+            background: linear-gradient(135deg, var(--blue), var(--purple));
+            display: flex; align-items: center; justify-content: center;
+            font-size: 28px; margin-bottom: 24px;
+            animation: loadPulse 1.5s ease-in-out infinite;
+            box-shadow: 0 0 40px rgba(59,130,246,0.3);
         }
-        @media (min-width: 768px) {
-            table.compare-table { font-size: 0.8em; }
-            table.compare-table th, table.compare-table td { padding: 8px 10px; }
+        .loading-title { font-size: 1.3em; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 8px; }
+        .loading-sub { font-size: 0.95em; color: var(--text-muted); margin-bottom: 32px; }
+        .loading-bar {
+            width: 200px; height: 3px; background: rgba(255,255,255,0.08);
+            border-radius: 3px; overflow: hidden;
         }
-        table.compare-table th {
-            background: rgba(59,130,246,0.15);
-            color: var(--blue);
-            font-size: 0.85em;
+        .loading-bar-fill {
+            height: 100%; width: 0%; border-radius: 3px;
+            background: linear-gradient(90deg, var(--blue), var(--purple), var(--blue));
+            background-size: 200% 100%;
+            animation: loadBar 1.8s ease-in-out forwards, loadShimmer 1s linear infinite;
         }
-        table.compare-table tr:nth-child(even) { background: rgba(255,255,255,0.02); }
-        table.compare-table tr:hover { background: rgba(59,130,246,0.05); }
+        @keyframes loadPulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 40px rgba(59,130,246,0.3); }
+            50% { transform: scale(1.08); box-shadow: 0 0 60px rgba(139,92,246,0.4); }
+        }
+        @keyframes loadBar { 0% { width: 0%; } 40% { width: 65%; } 80% { width: 90%; } 100% { width: 100%; } }
+        @keyframes loadShimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+        /* ── Card animations ── */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(16px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .college-card {
+            animation: fadeInUp 0.4s ease both;
+        }
+        .college-card:nth-child(1) { animation-delay: 0.03s; }
+        .college-card:nth-child(2) { animation-delay: 0.06s; }
+        .college-card:nth-child(3) { animation-delay: 0.09s; }
+        .college-card:nth-child(4) { animation-delay: 0.12s; }
+        .college-card:nth-child(5) { animation-delay: 0.15s; }
+        .college-card:nth-child(6) { animation-delay: 0.18s; }
+        .college-card:nth-child(7) { animation-delay: 0.21s; }
+        .college-card:nth-child(8) { animation-delay: 0.24s; }
+        .college-card:nth-child(9) { animation-delay: 0.27s; }
+        .college-card:nth-child(10) { animation-delay: 0.30s; }
+
+        .college-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        }
+
+        /* ── Detail panel animation ── */
+        @keyframes slideInRight {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        .detail-panel.visible { animation: slideInRight 0.35s ease both; }
+
+        .detail-section {
+            animation: fadeInUp 0.3s ease both;
+        }
+        .detail-section:nth-child(1) { animation-delay: 0.05s; }
+        .detail-section:nth-child(2) { animation-delay: 0.1s; }
+        .detail-section:nth-child(3) { animation-delay: 0.15s; }
+        .detail-section:nth-child(4) { animation-delay: 0.2s; }
+        .detail-section:nth-child(5) { animation-delay: 0.25s; }
+        .detail-section:nth-child(6) { animation-delay: 0.3s; }
+
+        /* ── Pill & legend hover ── */
+        .pill { transition: var(--transition), transform 0.15s ease; }
+        .pill:hover { transform: scale(1.04); }
+        .pill:active { transform: scale(0.97); }
+        .legend-item { transition: var(--transition), transform 0.15s ease; }
+        .legend-item:hover { transform: scale(1.04); }
+        .legend-item:active { transform: scale(0.97); }
+
+        /* ── Score circle glow ── */
+        .score-circle { transition: box-shadow 0.3s ease; }
+        .college-card:hover .score-circle { box-shadow: 0 0 12px rgba(255,255,255,0.1); }
+
+        /* ── Map controls slide up ── */
+        @keyframes controlsSlideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .map-controls { animation: controlsSlideUp 0.5s ease 0.3s both; }
     </style>
 </head>
 <body>
 
-<div class="header">
-    <h1>Outil d'aide à la mutation - Collèges 74</h1>
-    <div class="subtitle">Analyse comparative des collèges publics accessibles depuis Fillinges</div>
-    <div class="origin">
-        Domicile : 74250 Fillinges &bull; Profil : Certifiée CAPES
+<div class="loading-screen" id="loadingScreen">
+    <div class="loading-logo">&#127891;</div>
+    <div class="loading-title">Mutation Colleges 74</div>
+    <div class="loading-sub">Analyse des 21 colleges en cours...</div>
+    <div class="loading-bar"><div class="loading-bar-fill"></div></div>
+</div>
+
+<div class="app">
+    <header class="app-header">
+        <h1>Mutation Colleges 74</h1>
+        <div class="subtitle">Analyse comparative des colleges publics accessibles depuis Fillinges</div>
+        <div class="origin-badge">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            74250 Fillinges · Certifiee CAPES
+        </div>
+    </header>
+
+    <div class="main-content">
+        <div class="map-container">
+            <div id="map"></div>
+            <div class="map-controls">
+                <div class="ctrl-row">
+                    <div class="ctrl-section">
+                        <span class="ctrl-label">Type</span>
+                        <div class="filter-pills">
+                            <button class="pill active" data-filter="all" onclick="setFilter(this)">Tous</button>
+                            <button class="pill" data-filter="rep" onclick="setFilter(this)"><span class="pill-icon">&#9679;</span>REP <span class="pill-x">&#10005;</span></button>
+                            <button class="pill" data-filter="ulis" onclick="setFilter(this)"><span class="pill-icon">&#9679;</span>ULIS <span class="pill-x">&#10005;</span></button>
+                            <button class="pill" data-filter="segpa" onclick="setFilter(this)"><span class="pill-icon">&#9679;</span>SEGPA <span class="pill-x">&#10005;</span></button>
+                        </div>
+                    </div>
+                    <div class="ctrl-sep"></div>
+                    <div class="ctrl-section">
+                        <span class="ctrl-label">Crit&#232;res</span>
+                        <div class="filter-pills">
+                            <button class="pill" data-filter="no-toll" onclick="setFilter(this)"><span class="pill-icon">&#10003;</span>Sans p&#233;age <span class="pill-x">&#10005;</span></button>
+                            <button class="pill" data-filter="small" onclick="setFilter(this)"><span class="pill-icon">&#9679;</span>&#60; 700 &#233;l. <span class="pill-x">&#10005;</span></button>
+                            <button class="pill" data-filter="cheap" onclick="setFilter(this)"><span class="pill-icon">&#9679;</span>&#60; 5&#8364;/jour <span class="pill-x">&#10005;</span></button>
+                        </div>
+                    </div>
+                    <span class="result-count" id="resultCount"></span>
+                </div>
+                <div class="ctrl-row">
+                    <div class="ctrl-legend">
+                        <span class="ctrl-label">Temps de route</span>
+                        <div class="legend-item" data-time="green" onclick="setTimeRange(this)"><div class="legend-dot" style="background:var(--green)"></div>&#60; 15 min</div>
+                        <div class="legend-item" data-time="yellow" onclick="setTimeRange(this)"><div class="legend-dot" style="background:var(--yellow)"></div>15-25 min</div>
+                        <div class="legend-item" data-time="orange" onclick="setTimeRange(this)"><div class="legend-dot" style="background:var(--orange)"></div>25-35 min</div>
+                        <div class="legend-item" data-time="red" onclick="setTimeRange(this)"><div class="legend-dot" style="background:var(--red)"></div>&#62; 35 min</div>
+                        <div class="legend-item"><div class="legend-dot" style="background:linear-gradient(135deg,var(--blue),var(--purple))"></div>Domicile</div>
+                    </div>
+                    <div class="ctrl-sep"></div>
+                    <div class="ctrl-section">
+                        <span class="ctrl-label">Tri</span>
+                        <select class="select-styled" id="sortBy" onchange="renderCards()">
+                            <option value="score">Score</option>
+                            <option value="trajet_matin">Trajet</option>
+                            <option value="cout_annuel">Co&#251;t</option>
+                            <option value="brevet">Brevet</option>
+                            <option value="distance">Distance</option>
+                        </select>
+                    </div>
+                    <div class="ctrl-section">
+                        <span class="ctrl-label">Max</span>
+                        <div class="time-slider">
+                            <input type="range" id="maxTime" min="10" max="50" value="50" oninput="updateTimeLabel();renderCards()">
+                            <span class="time-val" id="timeLabel">50 min</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="list-panel">
+            <div class="cards-scroll" id="cardsScroll"></div>
+
+            <div class="detail-panel" id="detailPanel">
+                <div id="detailContent"></div>
+            </div>
+
+            <div class="disclaimer">
+                Temps de trajet estimes aux heures de pointe (8h/17h). Donnees : education.gouv.fr · college-lycee.com · ville-data.com · atmb.com
+            </div>
+        </div>
     </div>
 </div>
 
-<div class="info-banner">
-    <h3>Contexte : Éducation prioritaire en Haute-Savoie</h3>
-    <div class="info-grid">
-        <div class="info-item">
-            <strong>REP en Haute-Savoie :</strong><br>
-            Collège Michel Servet (Annemasse) &bull; Collège Jacques Prévert (Gaillard)<br>
-            <span style="font-size:0.8em;color:var(--muted)">Aucun REP+ dans le département</span>
-        </div>
-        <div class="info-item">
-            <strong>Avantages REP (CAPES) :</strong><br>
-            ISS ~1 734€/an &bull; NBI 30 pts d'indice<br>
-            Bonif. 50 pts mutation après 5 ans
-        </div>
-        <div class="info-item">
-            <strong>Hypothèses de calcul :</strong><br>
-            Essence : 1,75€/L &bull; Conso : 6,5L/100km<br>
-            200 jours travaillés/an &bull; Usure : 0,05€/km
-        </div>
-        <div class="info-item">
-            <strong>Trajet actuel (référence) :</strong><br>
-            St-Julien-en-Genevois : ~35 min matin / ~45 min soir<br>
-            <span style="color:var(--red)">Zone très embouteillée (axe Genève)</span>
-        </div>
+<div class="compare-bar" id="compareBar">
+    <div class="compare-info"><strong id="compareCount">0</strong> colleges selectionnes</div>
+    <div>
+        <button class="compare-btn" onclick="openCompare()">Comparer</button>
+        <button class="compare-reset" onclick="clearCompare()">Effacer</button>
     </div>
 </div>
 
-<div class="tab-container">
-    <div class="tab active" onclick="switchTab('cards')">Fiches détaillées</div>
-    <div class="tab" onclick="switchTab('table')">Tableau comparatif</div>
-    <div class="tab" onclick="switchTab('reco')">Recommandation voeux</div>
-</div>
-
-<div class="controls">
-    <div class="filter-group">
-        <label>Trier par :</label>
-        <select id="sortBy" onchange="renderCards()">
-            <option value="score">Score global (recommandé)</option>
-            <option value="trajet_matin">Temps trajet matin</option>
-            <option value="trajet_soir">Temps trajet soir</option>
-            <option value="cout_annuel">Coût annuel transport</option>
-            <option value="brevet">Taux réussite brevet</option>
-            <option value="effectif">Effectif (croissant)</option>
-            <option value="distance">Distance</option>
-        </select>
-    </div>
-    <div class="filter-group">
-        <label>Temps max trajet matin :</label>
-        <div style="display:flex;align-items:center;gap:8px;">
-            <input type="range" id="maxTime" min="10" max="50" value="40" oninput="updateTimeLabel();renderCards()">
-            <span id="timeLabel" style="font-weight:700;min-width:40px;">40 min</span>
+<div class="compare-modal" id="compareModal" onclick="if(event.target===this)closeCompare()">
+    <div class="compare-sheet">
+        <div class="compare-sheet-header">
+            <h2>Comparaison</h2>
+            <button class="close-sheet" onclick="closeCompare()">&#10005;</button>
         </div>
+        <div id="compareContent"></div>
     </div>
-    <div class="filter-group">
-        <label>Filtres :</label>
-        <div class="btn-group">
-            <button class="btn active" data-filter="all" onclick="toggleFilter(this)">Tous</button>
-            <button class="btn" data-filter="rep" onclick="toggleFilter(this)">REP uniquement</button>
-            <button class="btn" data-filter="no-toll" onclick="toggleFilter(this)">Sans péage</button>
-            <button class="btn" data-filter="small" onclick="toggleFilter(this)">&lt; 700 élèves</button>
-        </div>
-    </div>
-</div>
-
-<div class="legend">
-    <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div> &lt; 15 min</div>
-    <div class="legend-item"><div class="legend-dot" style="background:var(--yellow)"></div> 15-25 min</div>
-    <div class="legend-item"><div class="legend-dot" style="background:var(--orange)"></div> 25-35 min</div>
-    <div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div> &gt; 35 min</div>
-</div>
-
-<div id="tab-cards" class="tab-content active">
-    <div id="college-grid" class="college-grid"></div>
-</div>
-
-<div id="tab-table" class="tab-content">
-    <div style="overflow-x:auto;">
-        <table class="compare-table" id="compare-table"></table>
-    </div>
-</div>
-
-<div id="tab-reco" class="tab-content">
-    <div id="reco-content"></div>
-</div>
-
-<div class="disclaimer">
-    <strong>Avertissement :</strong> Les temps de trajet sont des estimations basées sur les conditions habituelles de trafic aux heures de pointe
-    (arrivée 8h, départ 17h). Ils peuvent varier selon les conditions météo, travaux, accidents. Les données sur les collèges proviennent de sources
-    publiques (annuaire Éducation nationale, ville-data.com, college-lycee.com) et peuvent avoir évolué. Les coûts de péage sont ceux d'ATMB au 1er février 2026.
-    Consultez l'annuaire officiel de l'Éducation nationale et le rectorat de Grenoble pour les données les plus à jour.<br><br>
-    <strong>Sources :</strong> education.gouv.fr &bull; annuaire-education.fr &bull; college-lycee.com &bull; ville-data.com &bull; atmb.com &bull; ac-grenoble.fr
 </div>
 
 <script>
-const ESSENCE_PRICE = 1.75; // €/L
-const CONSO = 6.5; // L/100km
-const USURE_KM = 0.05; // €/km
+const ESSENCE_PRICE = 1.75;
+const CONSO = 6.5;
+const USURE_KM = 0.05;
 const JOURS_AN = 200;
+const HOME = { lat: 46.2052, lng: 6.3340 };
 
 const colleges = [
-    // ===== ZONE TRÈS PROCHE (< 15 min) =====
     {
-        nom: "Collège Jean-Marie Molliet",
-        commune: "Boège",
-        adresse: "342 rue du Collège, 74420 Boège",
-        effectif: 499,
-        brevet: 91,
-        mentionTB: 40,
-        rep: false,
-        segpa: false,
-        ulis: false,
-        distance: 9,
-        trajet_matin: 12,
-        trajet_soir: 14,
-        trajet_matin_auto: null,
-        trajet_soir_auto: null,
-        peage_aller: 0,
-        peage_retour: 0,
-        autoroute: false,
-        axe: "D20 via Bogève, route directe (8.8 km)",
-        notes: "Le plus proche de Fillinges ! Petit collège à taille très humaine (499 élèves). Excellents résultats au brevet (91%, 97% en série générale). Route directe et tranquille via la Vallée Verte, aucun bouchon. Cadre rural très agréable.",
-        reputation: "Très bonne réputation. Petit collège familial avec d'excellents résultats. Moyenne écrite brevet 12.4/20. Cadre rural calme.",
-        options: "Section bilangue"
+        nom: "Coll\u00e8ge Jean-Marie Molliet", commune: "Bo\u00e8ge",
+        adresse: "342 rue du Coll\u00e8ge, 74420 Bo\u00e8ge", effectif: 499, brevet: 91, mentionTB: 40,
+        rep: false, segpa: false, ulis: false, distance: 9,
+        trajet_matin: 12, trajet_soir: 14, trajet_matin_auto: null, trajet_soir_auto: null,
+        peage_aller: 0, peage_retour: 0, autoroute: false,
+        axe: "D20 via Bog\u00e8ve, route directe (8.8 km)",
+        notes: "Le plus proche de Fillinges ! Petit coll\u00e8ge \u00e0 taille tr\u00e8s humaine. Excellents r\u00e9sultats au brevet (91%, 97% en s\u00e9rie g\u00e9n\u00e9rale). Route directe et tranquille via la Vall\u00e9e Verte, aucun bouchon.",
+        reputation: "Tr\u00e8s bonne r\u00e9putation. Petit coll\u00e8ge familial. Moyenne \u00e9crite brevet 12.4/20.",
+        options: "Section bilangue",
+        lat: 46.2093, lng: 6.3949
     },
     {
-        nom: "Collège Gaspard Monge",
-        commune: "Saint-Jeoire",
-        adresse: "60 rue Gaspard Monge, 74490 Saint-Jeoire",
-        effectif: 703,
-        brevet: 87,
-        mentionTB: 35,
-        rep: false,
-        segpa: false,
-        ulis: false,
-        distance: 9,
-        trajet_matin: 12,
-        trajet_soir: 14,
-        trajet_matin_auto: null,
-        trajet_soir_auto: null,
-        peage_aller: 0,
-        peage_retour: 0,
-        autoroute: false,
+        nom: "Coll\u00e8ge Gaspard Monge", commune: "Saint-Jeoire",
+        adresse: "60 rue Gaspard Monge, 74490 Saint-Jeoire", effectif: 703, brevet: 87, mentionTB: 35,
+        rep: false, segpa: false, ulis: false, distance: 9,
+        trajet_matin: 12, trajet_soir: 14, trajet_matin_auto: null, trajet_soir_auto: null,
+        peage_aller: 0, peage_retour: 0, autoroute: false,
         axe: "D907 via Viuz-en-Sallaz",
-        notes: "Collège de secteur pour Viuz-en-Sallaz et environs. Établissement à taille humaine. Route directe sans difficulté particulière. Pas de bouchons significatifs sur cet axe.",
-        reputation: "Bonne réputation locale. Cadre semi-rural agréable.",
-        options: "Section bilangue allemand"
+        notes: "Coll\u00e8ge de secteur pour Viuz-en-Sallaz et environs. Taille humaine. Route directe sans difficult\u00e9. Pas de bouchons.",
+        reputation: "Bonne r\u00e9putation locale. Cadre semi-rural agr\u00e9able.",
+        options: "Section bilangue allemand",
+        lat: 46.1388, lng: 6.4560
     },
     {
-        nom: "Collège La Pierre aux Fées",
-        commune: "Reignier-Ésery",
-        adresse: "130 rue du Collège, 74930 Reignier-Ésery",
-        effectif: 955,
-        brevet: 91,
-        mentionTB: 38,
-        rep: false,
-        segpa: false,
-        ulis: true,
-        distance: 13,
-        trajet_matin: 16,
-        trajet_soir: 20,
-        trajet_matin_auto: null,
-        trajet_soir_auto: null,
-        peage_aller: 0,
-        peage_retour: 0,
-        autoroute: false,
+        nom: "Coll\u00e8ge La Pierre aux F\u00e9es", commune: "Reignier-\u00c9sery",
+        adresse: "130 rue du Coll\u00e8ge, 74930 Reignier-\u00c9sery", effectif: 955, brevet: 91, mentionTB: 38,
+        rep: false, segpa: false, ulis: true, distance: 13,
+        trajet_matin: 16, trajet_soir: 20, trajet_matin_auto: null, trajet_soir_auto: null,
+        peage_aller: 0, peage_retour: 0, autoroute: false,
         axe: "D903 vers Reignier",
-        notes: "Gros collège avec d'excellents résultats au brevet. La D903 peut être chargée aux heures de pointe direction Annemasse/Genève mais Reignier est en amont des bouchons.",
-        reputation: "Très bonne réputation. Résultats DNB parmi les meilleurs du secteur. Classé ~1686e national.",
-        options: "ULIS, Section sportive"
+        notes: "Gros coll\u00e8ge avec d'excellents r\u00e9sultats. La D903 peut \u00eatre charg\u00e9e aux heures de pointe mais Reignier est en amont des bouchons.",
+        reputation: "Tr\u00e8s bonne r\u00e9putation. R\u00e9sultats DNB parmi les meilleurs du secteur.",
+        options: "ULIS, Section sportive",
+        lat: 46.1384, lng: 6.2673
     },
-    // ===== ZONE PROCHE (15-25 min) =====
     {
-        nom: "Collège Karine Ruby",
-        commune: "Saint-Pierre-en-Faucigny",
-        adresse: "74800 Saint-Pierre-en-Faucigny",
-        effectif: 664,
-        brevet: 86,
-        mentionTB: 37,
-        rep: false,
-        segpa: false,
-        ulis: false,
-        distance: 17,
-        trajet_matin: 20,
-        trajet_soir: 22,
-        trajet_matin_auto: null,
-        trajet_soir_auto: null,
-        peage_aller: 0,
-        peage_retour: 0,
-        autoroute: false,
+        nom: "Coll\u00e8ge Karine Ruby", commune: "Saint-Pierre-en-Faucigny",
+        adresse: "74800 Saint-Pierre-en-Faucigny", effectif: 664, brevet: 86, mentionTB: 37,
+        rep: false, segpa: false, ulis: false, distance: 17,
+        trajet_matin: 20, trajet_soir: 22, trajet_matin_auto: null, trajet_soir_auto: null,
+        peage_aller: 0, peage_retour: 0, autoroute: false,
         axe: "D1203 via Contamine-sur-Arve",
-        notes: "Collège récent (ouvert ~2015), bien équipé. Accès facile via la D1203. Trafic modéré sur cet axe.",
-        reputation: "Bonne réputation. Établissement moderne et dynamique. Note 5/5 L'Étudiant. Classé ~1652e national.",
-        options: "Section bilangue"
+        notes: "Coll\u00e8ge r\u00e9cent (ouvert ~2015), bien \u00e9quip\u00e9. Acc\u00e8s facile via la D1203. Trafic mod\u00e9r\u00e9.",
+        reputation: "Bonne r\u00e9putation. \u00c9tablissement moderne et dynamique. Note 5/5 L'\u00c9tudiant.",
+        options: "Section bilangue",
+        lat: 46.0797, lng: 6.3737
     },
     {
-        nom: "Collège Samivel",
-        commune: "Bonneville",
-        adresse: "247 avenue du Côteau, 74130 Bonneville",
-        effectif: 706,
-        brevet: 81,
-        mentionTB: 30,
-        rep: false,
-        segpa: true,
-        ulis: true,
-        distance: 16,
-        trajet_matin: 20,
-        trajet_soir: 22,
-        trajet_matin_auto: 14,
-        trajet_soir_auto: 16,
-        peage_aller: 1.30,
-        peage_retour: 1.30,
-        autoroute: true,
+        nom: "Coll\u00e8ge Samivel", commune: "Bonneville",
+        adresse: "247 avenue du C\u00f4teau, 74130 Bonneville", effectif: 706, brevet: 81, mentionTB: 30,
+        rep: false, segpa: true, ulis: true, distance: 16,
+        trajet_matin: 20, trajet_soir: 22, trajet_matin_auto: 14, trajet_soir_auto: 16,
+        peage_aller: 1.30, peage_retour: 1.30, autoroute: true,
         axe: "D1205 ou A40 sortie Bonneville Centre",
-        notes: "Sous-préfecture. Accès possible sans autoroute via D1205 (un peu plus long) ou A40 (péage 1,30€ gare Bonneville Centre, réduit à 0,33€ avec badge ATMB — 75% de réduction abonnés). Peu de bouchons.",
-        reputation: "Réputation correcte. SEGPA et ULIS présents = public mixte. Résultats brevet dans la moyenne.",
-        options: "SEGPA, ULIS, Options langues"
+        notes: "Sous-pr\u00e9fecture. Acc\u00e8s sans autoroute via D1205 ou A40 (p\u00e9age 1,30\u20ac, r\u00e9duit \u00e0 0,33\u20ac avec badge ATMB). Peu de bouchons.",
+        reputation: "R\u00e9putation correcte. SEGPA et ULIS = public mixte.",
+        options: "SEGPA, ULIS, Options langues",
+        lat: 46.0744, lng: 6.4089
     },
     {
-        nom: "Collège les Allobroges",
-        commune: "La Roche-sur-Foron",
-        adresse: "100 rue de l'Égalité, 74800 La Roche-sur-Foron",
-        effectif: 811,
-        brevet: 88,
-        mentionTB: 36,
-        rep: false,
-        segpa: false,
-        ulis: true,
-        distance: 17,
-        trajet_matin: 20,
-        trajet_soir: 22,
-        trajet_matin_auto: 15,
-        trajet_soir_auto: 17,
-        peage_aller: 0,
-        peage_retour: 0,
-        autoroute: false,
-        axe: "D1203 puis D1203/D6 vers La Roche",
-        notes: "Chef-lieu de canton, ville attractive. Accès par route nationale, trafic modéré. Possibilité A40 mais sans péage via nationale presque aussi rapide.",
-        reputation: "Très bonne réputation. Excellents résultats au brevet (88%). Grand collège bien structuré.",
-        options: "ULIS, Section bilangue, Options artistiques"
+        nom: "Coll\u00e8ge les Allobroges", commune: "La Roche-sur-Foron",
+        adresse: "100 rue de l'\u00c9galit\u00e9, 74800 La Roche-sur-Foron", effectif: 811, brevet: 88, mentionTB: 36,
+        rep: false, segpa: false, ulis: true, distance: 17,
+        trajet_matin: 20, trajet_soir: 22, trajet_matin_auto: 15, trajet_soir_auto: 17,
+        peage_aller: 0, peage_retour: 0, autoroute: false,
+        axe: "D1203 puis D6 vers La Roche",
+        notes: "Chef-lieu de canton, ville attractive. Acc\u00e8s par route nationale, trafic mod\u00e9r\u00e9.",
+        reputation: "Tr\u00e8s bonne r\u00e9putation. Excellents r\u00e9sultats (88%). Grand coll\u00e8ge bien structur\u00e9.",
+        options: "ULIS, Section bilangue, Options artistiques",
+        lat: 46.0661, lng: 6.3136
     },
     {
-        nom: "Collège Paul Émile Victor",
-        commune: "Cranves-Sales",
-        adresse: "74380 Cranves-Sales",
-        effectif: 890,
-        brevet: 84,
-        mentionTB: 33,
-        rep: false,
-        segpa: false,
-        ulis: false,
-        distance: 14,
-        trajet_matin: 18,
-        trajet_soir: 25,
-        trajet_matin_auto: null,
-        trajet_soir_auto: null,
-        peage_aller: 0,
-        peage_retour: 0,
-        autoroute: false,
+        nom: "Coll\u00e8ge Paul \u00c9mile Victor", commune: "Cranves-Sales",
+        adresse: "74380 Cranves-Sales", effectif: 890, brevet: 84, mentionTB: 33,
+        rep: false, segpa: false, ulis: false, distance: 14,
+        trajet_matin: 18, trajet_soir: 25, trajet_matin_auto: null, trajet_soir_auto: null,
+        peage_aller: 0, peage_retour: 0, autoroute: false,
         axe: "D903 vers Annemasse puis Cranves-Sales",
-        notes: "Situé en périphérie d'Annemasse. Attention : le retour à 17h peut être impacté par les bouchons de la zone d'Annemasse (trafic frontalier Genève).",
-        reputation: "Bonne réputation. Gros établissement. Résultats corrects au brevet.",
-        options: "Options langues, Atelier scientifique"
-    },
-    // ===== ZONE CRUSEILLES / GROISY =====
-    {
-        nom: "Collège Louis Armand",
-        commune: "Cruseilles",
-        adresse: "329 avenue des Ebeaux, 74350 Cruseilles",
-        effectif: 790,
-        brevet: 89,
-        mentionTB: 38,
-        rep: false,
-        segpa: false,
-        ulis: false,
-        distance: 38,
-        trajet_matin: 35,
-        trajet_soir: 42,
-        trajet_matin_auto: null,
-        trajet_soir_auto: null,
-        peage_aller: 0,
-        peage_retour: 0,
-        autoroute: false,
-        axe: "D903 → Reignier → D1201 direction Cruseilles (37.8 km par la route)",
-        notes: "Attention : Cruseilles est à 38 km par la route (22 km à vol d'oiseau). Le trajet passe par la zone de Reignier puis D1201 vers St-Julien/Cruseilles. Trafic frontalier sur la D1201 le soir. Bons résultats au brevet. Classé 610e national.",
-        reputation: "Bonne réputation. Classé 18e de Haute-Savoie. Bourg de caractère avec marché réputé.",
-        options: "Section bilangue, Options langues"
+        notes: "En p\u00e9riph\u00e9rie d'Annemasse. Attention : retour \u00e0 17h impact\u00e9 par les bouchons zone Annemasse.",
+        reputation: "Bonne r\u00e9putation. Gros \u00e9tablissement. R\u00e9sultats corrects.",
+        options: "Options langues, Atelier scientifique",
+        lat: 46.1837, lng: 6.2831
     },
     {
-        nom: "Collège du Parmelan",
-        commune: "Groisy",
-        adresse: "74570 Groisy",
-        effectif: 801,
-        brevet: 94,
-        mentionTB: 42,
-        rep: false,
-        segpa: false,
-        ulis: true,
-        distance: 30,
-        trajet_matin: 32,
-        trajet_soir: 36,
-        trajet_matin_auto: 26,
-        trajet_soir_auto: 30,
-        peage_aller: 0,
-        peage_retour: 0,
-        autoroute: false,
+        nom: "Coll\u00e8ge Louis Armand", commune: "Cruseilles",
+        adresse: "329 avenue des Ebeaux, 74350 Cruseilles", effectif: 790, brevet: 89, mentionTB: 38,
+        rep: false, segpa: false, ulis: false, distance: 38,
+        trajet_matin: 35, trajet_soir: 42, trajet_matin_auto: null, trajet_soir_auto: null,
+        peage_aller: 0, peage_retour: 0, autoroute: false,
+        axe: "D903 \u2192 Reignier \u2192 D1201 direction Cruseilles (37.8 km)",
+        notes: "Attention : 38 km par la route. Trafic frontalier sur la D1201 le soir. Bons r\u00e9sultats. Class\u00e9 610e national.",
+        reputation: "Bonne r\u00e9putation. Class\u00e9 18e de Haute-Savoie.",
+        options: "Section bilangue, Options langues",
+        lat: 46.0255, lng: 6.1055
+    },
+    {
+        nom: "Coll\u00e8ge du Parmelan", commune: "Groisy",
+        adresse: "74570 Groisy", effectif: 801, brevet: 94, mentionTB: 42,
+        rep: false, segpa: false, ulis: true, distance: 30,
+        trajet_matin: 32, trajet_soir: 36, trajet_matin_auto: 26, trajet_soir_auto: 30,
+        peage_aller: 0, peage_retour: 0, autoroute: false,
         axe: "D1203 via La Roche-sur-Foron puis D2 vers Groisy",
-        notes: "Excellent collège ! 94% au brevet, classé 9e de Haute-Savoie et 767e national. Route via La Roche-sur-Foron puis direction Annecy. Pas de bouchon majeur mais trajet un peu long.",
-        reputation: "Très bonne réputation. Parmi les meilleurs collèges du département. ULIS et section bilangue. Cadre rural agréable entre Annecy et La Roche.",
-        options: "ULIS, Section bilangue"
+        notes: "Excellent coll\u00e8ge ! 94% au brevet, class\u00e9 9e de Haute-Savoie. Pas de bouchon majeur mais trajet long.",
+        reputation: "Tr\u00e8s bonne r\u00e9putation. Parmi les meilleurs du d\u00e9partement.",
+        options: "ULIS, Section bilangue",
+        lat: 46.0001, lng: 6.1715
     },
-    // ===== ZONE ANNEMASSE - REP =====
     {
-        nom: "Collège Michel Servet",
-        commune: "Annemasse",
-        adresse: "2 bis avenue Jules Ferry, 74100 Annemasse",
-        effectif: 1134,
-        brevet: 86,
-        mentionTB: 28,
-        rep: true,
-        repPlus: false,
-        segpa: false,
-        ulis: true,
-        distance: 11,
-        trajet_matin: 18,
-        trajet_soir: 28,
-        trajet_matin_auto: null,
-        trajet_soir_auto: null,
-        peage_aller: 0,
-        peage_retour: 0,
-        autoroute: false,
+        nom: "Coll\u00e8ge Michel Servet", commune: "Annemasse",
+        adresse: "2 bis avenue Jules Ferry, 74100 Annemasse", effectif: 1134, brevet: 86, mentionTB: 28,
+        rep: true, repPlus: false, segpa: false, ulis: true, distance: 11,
+        trajet_matin: 18, trajet_soir: 28, trajet_matin_auto: null, trajet_soir_auto: null,
+        peage_aller: 0, peage_retour: 0, autoroute: false,
         axe: "D903 vers Annemasse centre",
-        notes: "REP ! Très gros collège (1134 élèves). Situé en centre d'Annemasse. Les bouchons du soir (17h) sont significatifs sur l'axe retour vers Fillinges à cause du trafic frontalier. Prime REP ~1734€/an + NBI 30 pts.",
-        reputation: "Classé REP. Public diversifié. Résultats brevet corrects (86% malgré le contexte REP). Équipe pédagogique engagée.",
-        options: "REP, ULIS, Sections bilangues, SEGPA à proximité"
+        notes: "REP ! Tr\u00e8s gros coll\u00e8ge (1134 \u00e9l\u00e8ves). Bouchons du soir significatifs. Prime REP ~1734\u20ac/an + NBI 30 pts.",
+        reputation: "Class\u00e9 REP. Public diversifi\u00e9. R\u00e9sultats corrects malgr\u00e9 le contexte (86%).",
+        options: "REP, ULIS, Sections bilangues",
+        lat: 46.1930, lng: 6.2344
     },
     {
-        nom: "Collège Jacques Prévert",
-        commune: "Gaillard",
-        adresse: "74240 Gaillard",
-        effectif: 655,
-        brevet: 60,
-        mentionTB: 20,
-        rep: true,
-        repPlus: false,
-        segpa: false,
-        ulis: false,
-        distance: 15,
-        trajet_matin: 22,
-        trajet_soir: 32,
-        trajet_matin_auto: null,
-        trajet_soir_auto: null,
-        peage_aller: 0,
-        peage_retour: 0,
-        autoroute: false,
+        nom: "Coll\u00e8ge Jacques Pr\u00e9vert", commune: "Gaillard",
+        adresse: "74240 Gaillard", effectif: 655, brevet: 60, mentionTB: 20,
+        rep: true, repPlus: false, segpa: false, ulis: false, distance: 15,
+        trajet_matin: 22, trajet_soir: 32, trajet_matin_auto: null, trajet_soir_auto: null,
+        peage_aller: 0, peage_retour: 0, autoroute: false,
         axe: "D903 vers Annemasse puis Gaillard",
-        notes: "REP ! Résultats plus faibles au brevet (60%). Gaillard est la commune limitrophe de Genève, trafic frontalier intense. Le retour le soir est le plus impacté par les bouchons de toute la liste.",
-        reputation: "Classé REP. Établissement en difficulté (brevet 60%). Contexte social difficile. Intérêt = bonification de points pour mutation future + primes.",
-        options: "REP, Dispositifs d'accompagnement renforcé"
+        notes: "REP ! R\u00e9sultats plus faibles (60%). Trafic frontalier intense. Retour le soir le plus impact\u00e9.",
+        reputation: "Class\u00e9 REP. Contexte social difficile. Int\u00e9r\u00eat = bonification points + primes.",
+        options: "REP, Dispositifs d'accompagnement renforc\u00e9",
+        lat: 46.1862, lng: 6.2086
     },
-    // ===== ZONE ARVE (DIRECTION CLUSES) =====
     {
-        nom: "Collège Camille Claudel",
-        commune: "Marignier",
-        adresse: "720 avenue d'Anterne, 74970 Marignier",
-        effectif: 612,
-        brevet: 85,
-        mentionTB: 32,
-        rep: false,
-        segpa: false,
-        ulis: false,
-        distance: 19,
-        trajet_matin: 22,
-        trajet_soir: 24,
-        trajet_matin_auto: 16,
-        trajet_soir_auto: 18,
-        peage_aller: 2.30,
-        peage_retour: 2.30,
-        autoroute: true,
+        nom: "Coll\u00e8ge Camille Claudel", commune: "Marignier",
+        adresse: "720 avenue d'Anterne, 74970 Marignier", effectif: 612, brevet: 85, mentionTB: 32,
+        rep: false, segpa: false, ulis: false, distance: 19,
+        trajet_matin: 22, trajet_soir: 24, trajet_matin_auto: 16, trajet_soir_auto: 18,
+        peage_aller: 2.30, peage_retour: 2.30, autoroute: true,
         axe: "D1205 ou A40 sortie Marignier/Cluses",
-        notes: "Direction vallée de l'Arve vers Chamonix. Sans autoroute : 22 min via D1205, route fluide. Avec A40 : plus rapide mais péage 2,30€/trajet. Pas de bouchons notables.",
-        reputation: "Collège récent, bonne réputation. Cadre montagnard. Taille humaine.",
-        options: "Options sportives montagne"
+        notes: "Direction vall\u00e9e de l'Arve. Sans autoroute : 22 min via D1205, route fluide. Avec A40 : p\u00e9age 2,30\u20ac/trajet.",
+        reputation: "Coll\u00e8ge r\u00e9cent, bonne r\u00e9putation. Cadre montagnard. Taille humaine.",
+        options: "Options sportives montagne",
+        lat: 46.0885, lng: 6.5016
     },
     {
-        nom: "Collège Jean-Jacques Gallay",
-        commune: "Scionzier",
-        adresse: "654 rue du Collège, 74950 Scionzier",
-        effectif: 823,
-        brevet: 84,
-        mentionTB: 42,
-        rep: false,
-        segpa: true,
-        ulis: false,
-        distance: 23,
-        trajet_matin: 25,
-        trajet_soir: 27,
-        trajet_matin_auto: 18,
-        trajet_soir_auto: 20,
-        peage_aller: 2.30,
-        peage_retour: 2.30,
-        autoroute: true,
+        nom: "Coll\u00e8ge Jean-Jacques Gallay", commune: "Scionzier",
+        adresse: "654 rue du Coll\u00e8ge, 74950 Scionzier", effectif: 823, brevet: 84, mentionTB: 42,
+        rep: false, segpa: true, ulis: false, distance: 23,
+        trajet_matin: 25, trajet_soir: 27, trajet_matin_auto: 18, trajet_soir_auto: 20,
+        peage_aller: 2.30, peage_retour: 2.30, autoroute: true,
         axe: "D1205 ou A40 sortie Scionzier",
-        notes: "Bon taux de mentions TB (42% !). Scionzier est une commune industrielle de la vallée de l'Arve (décolletage). Route similaire à Marignier. La D1205 est fluide.",
-        reputation: "Bonne réputation malgré un contexte ouvrier/industriel. Fort taux de mention TB. SEGPA présente.",
-        options: "SEGPA, Options techniques, Section sportive"
+        notes: "Bon taux de mentions TB (42% !). Commune industrielle de la vall\u00e9e de l'Arve. D1205 fluide.",
+        reputation: "Bonne r\u00e9putation. Fort taux de mention TB. SEGPA pr\u00e9sente.",
+        options: "SEGPA, Options techniques, Section sportive",
+        lat: 46.0604, lng: 6.5533
     },
     {
-        nom: "Collège G. Anthonioz de Gaulle",
-        commune: "Cluses",
-        adresse: "74300 Cluses",
-        effectif: 945,
-        brevet: 89,
-        mentionTB: 35,
-        rep: false,
-        segpa: false,
-        ulis: true,
-        distance: 30,
-        trajet_matin: 28,
-        trajet_soir: 30,
-        trajet_matin_auto: 20,
-        trajet_soir_auto: 22,
-        peage_aller: 2.30,
-        peage_retour: 2.30,
-        autoroute: true,
+        nom: "Coll\u00e8ge G. Anthonioz de Gaulle", commune: "Cluses",
+        adresse: "74300 Cluses", effectif: 945, brevet: 89, mentionTB: 35,
+        rep: false, segpa: false, ulis: true, distance: 30,
+        trajet_matin: 28, trajet_soir: 30, trajet_matin_auto: 20, trajet_soir_auto: 22,
+        peage_aller: 2.30, peage_retour: 2.30, autoroute: true,
         axe: "D1205 ou A40 sortie Cluses",
-        notes: "Gros collège avec de bons résultats (89%). Cluses = capitale du décolletage. Sans autoroute : 28 min sur D1205, route globalement fluide. A40 possible (péage 2,30€).",
-        reputation: "Bonne réputation. Résultats au-dessus de la moyenne. Classé ~1454e national. Ville dynamique.",
-        options: "ULIS, Sections bilangues, Options scientifiques"
+        notes: "Gros coll\u00e8ge avec de bons r\u00e9sultats (89%). Sans autoroute : 28 min. A40 possible (2,30\u20ac).",
+        reputation: "Bonne r\u00e9putation. Au-dessus de la moyenne. Ville dynamique.",
+        options: "ULIS, Sections bilangues, Options scientifiques",
+        lat: 46.0607, lng: 6.5818
     },
-    // ===== ZONE CHABLAIS =====
     {
-        nom: "Collège François Mugnier",
-        commune: "Bons-en-Chablais",
-        adresse: "260 avenue des Romains, 74890 Bons-en-Chablais",
-        effectif: 710,
-        brevet: 85,
-        mentionTB: 33,
-        rep: false,
-        segpa: false,
-        ulis: false,
-        distance: 20,
-        trajet_matin: 22,
-        trajet_soir: 25,
-        trajet_matin_auto: null,
-        trajet_soir_auto: null,
-        peage_aller: 0,
-        peage_retour: 0,
-        autoroute: false,
+        nom: "Coll\u00e8ge Fran\u00e7ois Mugnier", commune: "Bons-en-Chablais",
+        adresse: "260 avenue des Romains, 74890 Bons-en-Chablais", effectif: 710, brevet: 85, mentionTB: 33,
+        rep: false, segpa: false, ulis: false, distance: 20,
+        trajet_matin: 22, trajet_soir: 25, trajet_matin_auto: null, trajet_soir_auto: null,
+        peage_aller: 0, peage_retour: 0, autoroute: false,
         axe: "D903 puis D15/D35 vers Bons",
-        notes: "Direction Chablais, pas d'autoroute sur ce trajet. Route relativement fluide sauf traversée possible de Bonne. Commune en développement.",
-        reputation: "Bonne réputation. Commune en croissance démographique.",
-        options: "Options langues"
+        notes: "Direction Chablais, pas d'autoroute. Route relativement fluide. Commune en d\u00e9veloppement.",
+        reputation: "Bonne r\u00e9putation. Commune en croissance.",
+        options: "Options langues",
+        lat: 46.2521, lng: 6.3747
     },
     {
-        nom: "Collège du Bas Chablais",
-        commune: "Douvaine",
-        adresse: "74140 Douvaine",
-        effectif: 725,
-        brevet: 85,
-        mentionTB: 34,
-        rep: false,
-        segpa: false,
-        ulis: false,
-        distance: 21,
-        trajet_matin: 28,
-        trajet_soir: 32,
-        trajet_matin_auto: null,
-        trajet_soir_auto: null,
-        peage_aller: 0,
-        peage_retour: 0,
-        autoroute: false,
+        nom: "Coll\u00e8ge du Bas Chablais", commune: "Douvaine",
+        adresse: "74140 Douvaine", effectif: 725, brevet: 85, mentionTB: 34,
+        rep: false, segpa: false, ulis: false, distance: 21,
+        trajet_matin: 28, trajet_soir: 32, trajet_matin_auto: null, trajet_soir_auto: null,
+        peage_aller: 0, peage_retour: 0, autoroute: false,
         axe: "D903 direction Annemasse puis Douvaine",
-        notes: "Direction lac Léman / Suisse. Le trajet passe par la zone d'Annemasse qui peut être embouteillée. Le retour le soir est plus long à cause du trafic frontalier.",
-        reputation: "Bonne réputation. Zone résidentielle transfrontalière.",
-        options: "Section bilangue allemand, Options européennes"
+        notes: "Direction lac L\u00e9man / Suisse. Trajet par zone Annemasse qui peut \u00eatre embouteill\u00e9e.",
+        reputation: "Bonne r\u00e9putation. Zone r\u00e9sidentielle transfrontali\u00e8re.",
+        options: "Section bilangue allemand, Options europ\u00e9ennes",
+        lat: 46.3056, lng: 6.3036
     },
     {
-        nom: "Collège Champagne",
-        commune: "Thonon-les-Bains",
-        adresse: "3 rue Henri Baud, 74200 Thonon-les-Bains",
-        effectif: 957,
-        brevet: 86,
-        mentionTB: 34,
-        rep: false,
-        segpa: true,
-        ulis: false,
-        distance: 38,
-        trajet_matin: 40,
-        trajet_soir: 42,
-        trajet_matin_auto: null,
-        trajet_soir_auto: null,
-        peage_aller: 0,
-        peage_retour: 0,
-        autoroute: false,
+        nom: "Coll\u00e8ge Champagne", commune: "Thonon-les-Bains",
+        adresse: "3 rue Henri Baud, 74200 Thonon-les-Bains", effectif: 957, brevet: 86, mentionTB: 34,
+        rep: false, segpa: true, ulis: false, distance: 38,
+        trajet_matin: 40, trajet_soir: 42, trajet_matin_auto: null, trajet_soir_auto: null,
+        peage_aller: 0, peage_retour: 0, autoroute: false,
         axe: "D903 via Bons-en-Chablais puis voie rapide Thonon",
-        notes: "Assez éloigné. L'accès à Thonon se fait via les départementales D903/D903E, pas d'autoroute sur ce trajet. Joli cadre au bord du lac Léman mais trajet conséquent.",
-        reputation: "Grande ville, collège de centre-ville. SEGPA. Réputation correcte.",
-        options: "SEGPA, Options artistiques, Sections sportives"
+        notes: "Assez \u00e9loign\u00e9. Pas d'autoroute. Joli cadre au bord du lac L\u00e9man mais trajet cons\u00e9quent.",
+        reputation: "Grande ville, coll\u00e8ge de centre-ville. SEGPA. R\u00e9putation correcte.",
+        options: "SEGPA, Options artistiques, Sections sportives",
+        lat: 46.3694, lng: 6.4762
     },
     {
-        nom: "Collège Jean-Jacques Rousseau",
-        commune: "Thonon-les-Bains",
-        adresse: "38 avenue du Général de Gaulle, 74200 Thonon-les-Bains",
-        effectif: 860,
-        brevet: 87,
-        mentionTB: 35,
-        rep: false,
-        segpa: false,
-        ulis: true,
-        distance: 38,
-        trajet_matin: 40,
-        trajet_soir: 42,
-        trajet_matin_auto: null,
-        trajet_soir_auto: null,
-        peage_aller: 0,
-        peage_retour: 0,
-        autoroute: false,
+        nom: "Coll\u00e8ge Jean-Jacques Rousseau", commune: "Thonon-les-Bains",
+        adresse: "38 av. du G\u00e9n\u00e9ral de Gaulle, 74200 Thonon", effectif: 860, brevet: 87, mentionTB: 35,
+        rep: false, segpa: false, ulis: true, distance: 38,
+        trajet_matin: 40, trajet_soir: 42, trajet_matin_auto: null, trajet_soir_auto: null,
+        peage_aller: 0, peage_retour: 0, autoroute: false,
         axe: "D903 via Bons-en-Chablais puis voie rapide Thonon",
-        notes: "Même trajet que Champagne (pas d'autoroute). Bons résultats. Thonon offre un bon cadre de vie mais le temps de route est un frein.",
-        reputation: "Bonne réputation. ULIS. Résultats au-dessus de la moyenne.",
-        options: "ULIS, Options langues"
+        notes: "M\u00eame trajet que Champagne. Bons r\u00e9sultats. Thonon offre un bon cadre de vie mais temps de route = frein.",
+        reputation: "Bonne r\u00e9putation. ULIS. R\u00e9sultats au-dessus de la moyenne.",
+        options: "ULIS, Options langues",
+        lat: 46.3720, lng: 6.4800
     },
-    // ===== RÉFÉRENCE : POSTE ACTUEL =====
     {
-        nom: "Collège JJ Rousseau (actuel)",
-        commune: "Saint-Julien-en-Genevois",
-        adresse: "74160 Saint-Julien-en-Genevois",
-        effectif: 610,
-        brevet: 83,
-        mentionTB: 35,
-        rep: false,
-        segpa: false,
-        ulis: false,
-        distance: 29,
-        trajet_matin: 35,
-        trajet_soir: 45,
-        trajet_matin_auto: 28,
-        trajet_soir_auto: 38,
-        peage_aller: 2.20,
-        peage_retour: 2.20,
-        autoroute: true,
-        axe: "D903 → Annemasse → A411 (gratuite) → St-Julien, ou A40 (Scientrier→Gaillard 2,20€) + A411",
-        notes: "POSTE ACTUEL - À titre de comparaison. L'A411 Annemasse-St-Julien est gratuite (jusqu'en 2029). Option plus rapide via A40 Scientrier→Gaillard (2,20€/trajet). Embouteillages chroniques matin ET soir dus au trafic transfrontalier.",
-        reputation: "Établissement correct mais le trajet est le problème principal.",
+        nom: "Coll\u00e8ge JJ Rousseau (actuel)", commune: "Saint-Julien-en-Genevois",
+        adresse: "74160 Saint-Julien-en-Genevois", effectif: 610, brevet: 83, mentionTB: 35,
+        rep: false, segpa: false, ulis: false, distance: 29,
+        trajet_matin: 35, trajet_soir: 45, trajet_matin_auto: 28, trajet_soir_auto: 38,
+        peage_aller: 2.20, peage_retour: 2.20, autoroute: true,
+        axe: "D903 \u2192 Annemasse \u2192 A411 \u2192 St-Julien, ou A40 (2,20\u20ac) + A411",
+        notes: "POSTE ACTUEL \u2014 Embouteillages chroniques matin ET soir (trafic transfrontalier).",
+        reputation: "\u00c9tablissement correct mais le trajet est le probl\u00e8me principal.",
         options: "Section bilangue, SEGPA",
-        isReference: true
+        isReference: true,
+        lat: 46.1432, lng: 6.0829
     },
     {
-        nom: "Collège Arthur Rimbaud",
-        commune: "Saint-Julien-en-Genevois",
-        adresse: "8 avenue Napoléon III, 74160 Saint-Julien-en-Genevois",
-        effectif: 510,
-        brevet: 62,
-        mentionTB: 32,
-        rep: false,
-        segpa: true,
-        ulis: true,
-        distance: 29,
-        trajet_matin: 35,
-        trajet_soir: 45,
-        trajet_matin_auto: 28,
-        trajet_soir_auto: 38,
-        peage_aller: 2.20,
-        peage_retour: 2.20,
-        autoroute: true,
-        axe: "D903 → Annemasse → A411 (gratuite) → St-Julien, ou A40 (Scientrier→Gaillard 2,20€) + A411",
-        notes: "Même trajet problématique que le poste actuel. Option A40 (2,20€/trajet) possible. Résultats au brevet faibles (62%). SEGPA + ULIS. Aucun intérêt de demander ce poste.",
-        reputation: "Résultats faibles. Public difficile. Même problème de trajet que le poste actuel.",
+        nom: "Coll\u00e8ge Arthur Rimbaud", commune: "Saint-Julien-en-Genevois",
+        adresse: "8 avenue Napol\u00e9on III, 74160 Saint-Julien", effectif: 510, brevet: 62, mentionTB: 32,
+        rep: false, segpa: true, ulis: true, distance: 29,
+        trajet_matin: 35, trajet_soir: 45, trajet_matin_auto: 28, trajet_soir_auto: 38,
+        peage_aller: 2.20, peage_retour: 2.20, autoroute: true,
+        axe: "D903 \u2192 Annemasse \u2192 A411 \u2192 St-Julien, ou A40 (2,20\u20ac) + A411",
+        notes: "M\u00eame trajet probl\u00e9matique. R\u00e9sultats faibles (62%). Aucun int\u00e9r\u00eat de demander ce poste.",
+        reputation: "R\u00e9sultats faibles. Public difficile. M\u00eame probl\u00e8me de trajet.",
         options: "SEGPA, ULIS, Section bilangue",
-        isReference: true
+        isReference: true,
+        lat: 46.1458, lng: 6.0870
     }
 ];
 
-function calculateCosts(college) {
-    const distAR = college.distance * 2;
+function calculateCosts(c) {
+    const distAR = c.distance * 2;
     const essenceJour = (distAR / 100) * CONSO * ESSENCE_PRICE;
     const usureJour = distAR * USURE_KM;
-    const peageJour = college.peage_aller + college.peage_retour;
+    const peageJour = c.peage_aller + c.peage_retour;
     const totalJour = essenceJour + usureJour + peageJour;
     const totalMois = totalJour * (JOURS_AN / 10);
     const totalAn = totalJour * JOURS_AN;
     return { essenceJour, usureJour, peageJour, totalJour, totalMois, totalAn, distAR };
 }
 
-function calculateScore(college) {
-    const costs = calculateCosts(college);
-    // Pondérations : trajet (40%), coût (20%), brevet (15%), taille (10%), confort (15%)
-    const trajetScore = Math.max(0, 100 - ((college.trajet_matin + college.trajet_soir) / 2 - 10) * 3);
+function calculateScore(c) {
+    const costs = calculateCosts(c);
+    const trajetScore = Math.max(0, 100 - ((c.trajet_matin + c.trajet_soir) / 2 - 10) * 3);
     const coutScore = Math.max(0, 100 - costs.totalAn / 40);
-    const brevetScore = college.brevet;
-    const tailleScore = college.effectif < 500 ? 70 : college.effectif < 700 ? 90 : college.effectif < 900 ? 80 : college.effectif < 1100 ? 65 : 50;
-    // Confort = absence de bouchons, facilité de route
-    const confortScore = college.trajet_soir - college.trajet_matin < 5 ? 90 : college.trajet_soir - college.trajet_matin < 10 ? 70 : 50;
-
+    const brevetScore = c.brevet;
+    const tailleScore = c.effectif < 500 ? 70 : c.effectif < 700 ? 90 : c.effectif < 900 ? 80 : c.effectif < 1100 ? 65 : 50;
+    const confortScore = c.trajet_soir - c.trajet_matin < 5 ? 90 : c.trajet_soir - c.trajet_matin < 10 ? 70 : 50;
     let score = trajetScore * 0.40 + coutScore * 0.20 + brevetScore * 0.15 + tailleScore * 0.10 + confortScore * 0.15;
-
-    // Bonus REP (si stratégie de points)
-    if (college.rep) score += 3;
-
-    // Malus si référence
-    if (college.isReference) score -= 20;
-
+    if (c.rep) score += 3;
+    if (c.isReference) score -= 20;
     return Math.round(Math.min(100, Math.max(0, score)));
 }
 
-function getTimeClass(minutes) {
-    if (minutes <= 15) return 'time-green';
-    if (minutes <= 25) return 'time-yellow';
-    if (minutes <= 35) return 'time-orange';
+function getTimeClass(min) {
+    if (min <= 15) return 'time-green';
+    if (min <= 25) return 'time-yellow';
+    if (min <= 35) return 'time-orange';
     return 'time-red';
 }
 
-function getScoreColor(score) {
-    if (score >= 80) return 'var(--green)';
-    if (score >= 65) return 'var(--yellow)';
-    if (score >= 50) return 'var(--orange)';
+function getScoreColor(s) {
+    if (s >= 80) return 'var(--green)';
+    if (s >= 65) return 'var(--yellow)';
+    if (s >= 50) return 'var(--orange)';
     return 'var(--red)';
+}
+
+function getMarkerClass(s) {
+    if (s >= 80) return 'marker-green';
+    if (s >= 65) return 'marker-yellow';
+    if (s >= 50) return 'marker-orange';
+    return 'marker-red';
+}
+
+function formatDeparture(min) {
+    const h = 8 * 60 - min - 10;
+    return Math.floor(h/60) + 'h' + String(h%60).padStart(2,'0');
+}
+
+function formatArrival(min) {
+    const h = 17 * 60 + min;
+    return Math.floor(h/60) + 'h' + String(h%60).padStart(2,'0');
+}
+
+function mapsLink(c) {
+    return 'https://www.google.com/maps/dir/Fillinges,+74250/' + encodeURIComponent(c.adresse);
+}
+
+function educNatLink(c) {
+    return 'https://www.education.gouv.fr/annuaire?keywords=' + encodeURIComponent(c.nom + ' ' + c.commune) + '&department=074';
+}
+
+function collegeLyceeLink(c) {
+    return 'https://www.college-lycee.com/recherche?q=' + encodeURIComponent(c.nom + ' ' + c.commune);
+}
+
+function villeDataLink(c) {
+    return 'https://ville-data.com/college/' + encodeURIComponent(c.commune.replace(/\s/g, '-')) + '-74';
+}
+
+let activeFilters = new Set();
+let activeTimeRange = null;
+let expandedCard = null;
+let selectedCompare = new Set();
+let markers = {};
+let map;
+
+function initMap() {
+    map = L.map('map', { zoomControl: true, attributionControl: true }).setView([HOME.lat, HOME.lng], 11);
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '\u00a9 <a href="https://www.openstreetmap.org/copyright">OSM</a> \u00a9 <a href="https://carto.com/">CARTO</a>',
+        maxZoom: 18
+    }).addTo(map);
+
+    var homeIcon = L.divIcon({
+        className: '',
+        html: '<div class="marker-icon marker-home">\u2302</div>',
+        iconSize: [40, 40], iconAnchor: [20, 20]
+    });
+    L.marker([HOME.lat, HOME.lng], { icon: homeIcon, zIndex: 1000 })
+        .addTo(map)
+        .bindPopup('<div class="popup-name">Domicile</div><div class="popup-commune">74250 Fillinges</div>');
+
+    // Compute top 3 ranking
+    var ranked = colleges.map(function(c, i) { return {idx: i, score: calculateScore(c), ref: c.isReference}; })
+        .filter(function(r) { return !r.ref; })
+        .sort(function(a, b) { return b.score - a.score; });
+    var topMap = {};
+    var medals = {1: '\ud83e\udd47', 2: '\ud83e\udd48', 3: '\ud83e\udd49'};
+    for (var r = 0; r < 3 && r < ranked.length; r++) topMap[ranked[r].idx] = r + 1;
+
+    colleges.forEach(function(c, i) {
+        if (!c.lat || !c.lng) return;
+        var score = calculateScore(c);
+        var colorClass = c.isReference ? 'marker-ref' : getMarkerClass(score);
+        var topRank = topMap[i];
+        var markerHtml, markerSize;
+
+        if (topRank) {
+            markerHtml = '<div class="marker-icon marker-top top-' + topRank + ' ' + colorClass + '" data-idx="' + i + '">'
+                + '<span class="medal-badge">' + medals[topRank] + '</span>' + score + '</div>';
+            markerSize = [42, 42];
+        } else {
+            markerHtml = '<div class="marker-icon ' + colorClass + '" data-idx="' + i + '">' + score + '</div>';
+            markerSize = [42, 42];
+        }
+
+        var icon = L.divIcon({
+            className: '',
+            html: markerHtml,
+            iconSize: markerSize, iconAnchor: [markerSize[0]/2, markerSize[1]/2]
+        });
+
+        var m = L.marker([c.lat, c.lng], { icon: icon, zIndex: c.isReference ? 100 : (topRank ? 900 - topRank : 500) })
+            .addTo(map);
+
+        m.on('click', (function(idx) { return function(e) {
+            L.DomEvent.stopPropagation(e);
+            openDetailForIdx(idx);
+        }; })(i));
+        markers[i] = m;
+    });
+
+    map.on('click', function() {
+        if (expandedCard !== null) closeDetail();
+    });
+
+    // Fit to show all markers with good padding
+    setTimeout(function() { zoomToAll(); }, 100);
+}
+
+function escapeHtml(text) {
+    var div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function zoomToAll() {
+    var nearby = [];
+    colleges.forEach(function(c, i) {
+        if (c.trajet_matin <= 30 && markers[i]) nearby.push(markers[i]);
+    });
+    if (nearby.length === 0) nearby = Object.values(markers);
+    var group = L.featureGroup(nearby);
+    group.addLayer(L.marker([HOME.lat, HOME.lng]));
+    map.fitBounds(group.getBounds().pad(0.05));
+}
+
+function highlightCard(idx) {
+    document.querySelectorAll('.college-card').forEach(function(c) { c.classList.remove('highlighted'); });
+    var card = document.querySelector('.college-card[data-idx="' + idx + '"]');
+    if (card) {
+        card.classList.add('highlighted');
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+}
+
+function scrollToCard(idx) {
+    openDetailForIdx(idx);
+}
+
+function openDetailForIdx(idx) {
+    if (expandedCard === idx) return;
+    expandedCard = idx;
+    var c = colleges[idx];
+    document.getElementById('detailContent').innerHTML = buildDetailHtml(c, idx);
+    document.getElementById('cardsScroll').style.display = 'none';
+    document.querySelector('.disclaimer').style.display = 'none';
+    document.getElementById('detailPanel').classList.add('visible');
+    document.getElementById('detailPanel').scrollTop = 0;
+    zoomToMarker(idx);
+}
+
+function zoomToMarker(idx) {
+    var c = colleges[idx];
+    if (c.lat && c.lng && markers[idx]) {
+        map.flyTo([c.lat, c.lng], 13, { duration: 0.5 });
+    }
 }
 
 function updateTimeLabel() {
     document.getElementById('timeLabel').textContent = document.getElementById('maxTime').value + ' min';
 }
 
-let activeFilter = 'all';
-function toggleFilter(btn) {
-    document.querySelectorAll('.btn[data-filter]').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    activeFilter = btn.dataset.filter;
+function setFilter(btn) {
+    var filter = btn.dataset.filter;
+    if (filter === 'all') {
+        activeFilters.clear();
+    } else if (activeFilters.has(filter)) {
+        activeFilters.delete(filter);
+    } else {
+        activeFilters.add(filter);
+    }
+    document.querySelectorAll('.pill').forEach(function(b) {
+        var f = b.dataset.filter;
+        if (f === 'all') {
+            b.classList.toggle('active', activeFilters.size === 0);
+        } else {
+            b.classList.toggle('active', activeFilters.has(f));
+        }
+    });
     renderCards();
 }
 
+function setTimeRange(el) {
+    var range = el.dataset.time;
+    if (activeTimeRange === range) {
+        activeTimeRange = null;
+    } else {
+        activeTimeRange = range;
+    }
+    document.querySelectorAll('.legend-item[data-time]').forEach(function(li) { li.classList.remove('active'); });
+    if (activeTimeRange) {
+        var activeLi = document.querySelector('.legend-item[data-time="' + activeTimeRange + '"]');
+        if (activeLi) activeLi.classList.add('active');
+    }
+    renderCards();
+}
+
+function matchesTimeRange(c) {
+    if (!activeTimeRange) return true;
+    var t = c.trajet_matin;
+    switch(activeTimeRange) {
+        case 'green': return t <= 15;
+        case 'yellow': return t > 15 && t <= 25;
+        case 'orange': return t > 25 && t <= 35;
+        case 'red': return t > 35;
+    }
+    return true;
+}
+
 function getFilteredColleges() {
-    const maxTime = parseInt(document.getElementById('maxTime').value);
-    return colleges.filter(c => {
+    var maxTime = parseInt(document.getElementById('maxTime').value);
+    return colleges.filter(function(c) {
         if (c.trajet_matin > maxTime && !c.isReference) return false;
-        if (activeFilter === 'rep' && !c.rep) return false;
-        if (activeFilter === 'no-toll' && c.peage_aller > 0) return false;
-        if (activeFilter === 'small' && c.effectif >= 700) return false;
+        if (!c.isReference && !matchesTimeRange(c)) return false;
+        if (activeFilters.size === 0) return true;
+
+        // Type filters (REP, ULIS, SEGPA) → OR logic between them
+        var typeFilters = ['rep', 'ulis', 'segpa'];
+        var activeTypes = typeFilters.filter(function(t) { return activeFilters.has(t); });
+        if (activeTypes.length > 0) {
+            var matchesType = activeTypes.some(function(t) {
+                if (t === 'rep') return c.rep;
+                if (t === 'ulis') return c.ulis;
+                if (t === 'segpa') return c.segpa;
+                return false;
+            });
+            if (!matchesType) return false;
+        }
+
+        // Criteria filters → AND logic (each one must pass)
+        if (activeFilters.has('no-toll') && c.peage_aller > 0) return false;
+        if (activeFilters.has('small') && c.effectif >= 700) return false;
+        if (activeFilters.has('cheap') && calculateCosts(c).totalJour >= 5) return false;
+
         return true;
     });
 }
 
 function getSortedColleges(filtered) {
-    const sortBy = document.getElementById('sortBy').value;
-    return [...filtered].sort((a, b) => {
+    var sortBy = document.getElementById('sortBy').value;
+    return filtered.slice().sort(function(a, b) {
         if (a.isReference && !b.isReference) return 1;
         if (!a.isReference && b.isReference) return -1;
         switch(sortBy) {
@@ -1082,293 +1325,342 @@ function getSortedColleges(filtered) {
             case 'trajet_soir': return a.trajet_soir - b.trajet_soir;
             case 'cout_annuel': return calculateCosts(a).totalAn - calculateCosts(b).totalAn;
             case 'brevet': return b.brevet - a.brevet;
-            case 'effectif': return a.effectif - b.effectif;
             case 'distance': return a.distance - b.distance;
+            default: return 0;
         }
     });
 }
 
+function getProsCons(c) {
+    var pros = [];
+    var cons = [];
+    var costs = calculateCosts(c);
+    // Trajet
+    if (c.trajet_matin <= 15) pros.push({icon: '\u26a1', text: 'Trajet rapide (' + c.trajet_matin + ' min)'});
+    else if (c.trajet_matin <= 20) pros.push({icon: '\ud83d\ude97', text: 'Trajet raisonnable (' + c.trajet_matin + ' min)'});
+    if (c.trajet_soir >= 35) cons.push({icon: '\ud83d\ude97', text: 'Retour long (' + c.trajet_soir + ' min)'});
+    if (c.trajet_soir - c.trajet_matin >= 8) cons.push({icon: '\u26a0\ufe0f', text: '\u00c9cart matin/soir important (bouchons)'});
+    // Co\u00fbt
+    if (costs.totalAn < 1200) pros.push({icon: '\ud83d\udcb0', text: 'Tr\u00e8s \u00e9conomique (' + costs.totalAn.toFixed(0) + '\u20ac/an)'});
+    else if (costs.totalAn < 1800) pros.push({icon: '\ud83d\udcb6', text: 'Co\u00fbt mod\u00e9r\u00e9 (' + costs.totalAn.toFixed(0) + '\u20ac/an)'});
+    if (costs.totalAn > 2500) cons.push({icon: '\ud83d\udcb8', text: 'Co\u00fbt \u00e9lev\u00e9 (' + costs.totalAn.toFixed(0) + '\u20ac/an)'});
+    if (c.peage_aller > 0) cons.push({icon: '\ud83d\udee3\ufe0f', text: 'P\u00e9age ' + (c.peage_aller * 2).toFixed(1) + '\u20ac/jour'});
+    if (!c.autoroute && c.peage_aller === 0 && c.trajet_matin <= 25) pros.push({icon: '\u2705', text: 'Aucun p\u00e9age'});
+    // Brevet
+    if (c.brevet >= 90) pros.push({icon: '\ud83c\udf93', text: 'Excellent brevet (' + c.brevet + '%)'});
+    else if (c.brevet >= 87) pros.push({icon: '\ud83d\udcca', text: 'Bon brevet (' + c.brevet + '%)'});
+    if (c.brevet < 75) cons.push({icon: '\ud83d\udcc9', text: 'R\u00e9sultats faibles (' + c.brevet + '%)'});
+    // Mention TB
+    if (c.mentionTB >= 40) pros.push({icon: '\u2b50', text: c.mentionTB + '% mention TB !'});
+    // Taille
+    if (c.effectif < 600) pros.push({icon: '\ud83d\udc65', text: 'Petit coll\u00e8ge familial (' + c.effectif + ')'});
+    if (c.effectif > 1000) cons.push({icon: '\ud83c\udfeb', text: 'Tr\u00e8s gros \u00e9tablissement (' + c.effectif + ')'});
+    // REP
+    if (c.rep) pros.push({icon: '\ud83d\udc8e', text: 'Prime REP ~1\u202f734\u20ac/an + NBI'});
+    // English teacher relevant
+    var optLower = c.options.toLowerCase();
+    if (optLower.indexOf('bilangue') !== -1 && optLower.indexOf('allemand') === -1) {
+        pros.push({icon: '\ud83c\uddec\ud83c\udde7', text: 'Section bilangue (anglais)', english: true});
+    }
+    if (optLower.indexOf('europ\u00e9en') !== -1 || optLower.indexOf('europeen') !== -1) {
+        pros.push({icon: '\ud83c\uddea\ud83c\uddfa', text: 'Options europ\u00e9ennes', english: true});
+    }
+    if (optLower.indexOf('langues') !== -1) {
+        pros.push({icon: '\ud83c\udf0d', text: 'Options langues', english: true});
+    }
+    if (optLower.indexOf('bilangue allemand') !== -1) {
+        cons.push({icon: '\ud83c\udde9\ud83c\uddea', text: 'Bilangue allemand (pas anglais)'});
+    }
+    // Reference
+    if (c.isReference) cons.push({icon: '\ud83d\udccd', text: 'Poste actuel \u2014 pas d\'am\u00e9lioration'});
+    return {pros: pros, cons: cons};
+}
+
+function buildCardHtml(c, idx, rank, isTop3) {
+    var costs = calculateCosts(c);
+    var score = calculateScore(c);
+    var isSelected = selectedCompare.has(idx);
+    var dotColor = getTimeClass(c.trajet_matin).replace('time-','');
+    var dotColorMap = {green:'var(--green)',yellow:'var(--yellow)',orange:'var(--orange)',red:'var(--red)'};
+    var dotSoirColor = getTimeClass(c.trajet_soir).replace('time-','');
+
+    var html = '<div class="college-card' + (c.isReference ? ' is-reference' : '') + (isSelected ? ' selected' : '') + (isTop3 ? ' top-' + rank : '') + '" data-idx="' + idx + '" onclick="toggleCard(' + idx + ', event)">';
+
+    html += '<div class="compare-check' + (isSelected ? ' checked' : '') + '" onclick="toggleCompare(' + idx + ', event)" title="Comparer"></div>';
+
+    html += '<div class="card-header"><div class="card-left">';
+    var medals = {1: '\ud83e\udd47', 2: '\ud83e\udd48', 3: '\ud83e\udd49'};
+    if (isTop3) html += '<div class="card-rank-inline rank-' + rank + '">' + medals[rank] + ' VOEU N\u00b0' + rank + '</div>';
+    html += '<div class="card-name">' + escapeHtml(c.nom) + '</div>'
+        + '<div class="card-commune">' + escapeHtml(c.commune) + ' \u2014 ' + c.distance + ' km</div>'
+        + '</div><div class="card-right">'
+        + '<div class="score-circle" style="color:' + getScoreColor(score) + ';border-color:' + getScoreColor(score) + '">' + score + '</div>'
+        + '<div class="card-badges">'
+        + (c.rep ? '<span class="badge badge-rep">REP</span>' : '')
+        + (c.isReference ? '<span class="badge badge-ref">ACTUEL</span>' : '')
+        + (c.segpa ? '<span class="badge badge-segpa">SEGPA</span>' : '')
+        + (c.ulis ? '<span class="badge badge-ulis">ULIS</span>' : '')
+        + '</div></div></div>';
+
+    html += '<div class="card-quick-stats">'
+        + '<div class="quick-stat"><div class="dot" style="background:' + dotColorMap[dotColor] + '"></div><span class="val ' + getTimeClass(c.trajet_matin) + '">' + c.trajet_matin + ' min</span> matin</div>'
+        + '<div class="quick-stat"><div class="dot" style="background:' + dotColorMap[dotSoirColor] + '"></div><span class="val ' + getTimeClass(c.trajet_soir) + '">' + c.trajet_soir + ' min</span> soir</div>'
+        + '<div class="quick-stat"><span class="val">' + c.distance + ' km</span></div>'
+        + '<div class="quick-stat"><span class="val">' + costs.totalJour.toFixed(1) + '\u20ac</span>/jour</div>'
+        + '</div>';
+
+    html += '</div>';
+    return html;
+}
+
+function buildDetailHtml(c, idx) {
+    var costs = calculateCosts(c);
+    var score = calculateScore(c);
+    var pc = getProsCons(c);
+
+    var html = '<button class="detail-back" onclick="closeDetail()">\u2190 Retour \u00e0 la liste</button>';
+
+    // Hero
+    html += '<div class="detail-hero"><div>'
+        + '<div class="detail-name">' + escapeHtml(c.nom) + '</div>'
+        + '<div class="detail-commune">' + escapeHtml(c.commune) + ' \u2014 ' + c.distance + ' km</div>'
+        + '</div>'
+        + '<div class="score-circle" style="color:' + getScoreColor(score) + ';border-color:' + getScoreColor(score) + '">' + score + '</div>'
+        + '</div>';
+
+    // Badges
+    var badges = '';
+    if (c.rep) badges += '<span class="badge badge-rep">REP</span>';
+    if (c.isReference) badges += '<span class="badge badge-ref">POSTE ACTUEL</span>';
+    if (c.segpa) badges += '<span class="badge badge-segpa">SEGPA</span>';
+    if (c.ulis) badges += '<span class="badge badge-ulis">ULIS</span>';
+    if (badges) html += '<div class="detail-badges">' + badges + '</div>';
+
+    // Quick grid
+    html += '<div class="detail-quick-grid">'
+        + '<div class="detail-quick-item"><div class="dq-label">Matin</div><div class="dq-value ' + getTimeClass(c.trajet_matin) + '">' + c.trajet_matin + ' min</div></div>'
+        + '<div class="detail-quick-item"><div class="dq-label">Soir</div><div class="dq-value ' + getTimeClass(c.trajet_soir) + '">' + c.trajet_soir + ' min</div></div>'
+        + '<div class="detail-quick-item"><div class="dq-label">Distance</div><div class="dq-value">' + c.distance + ' km</div></div>'
+        + '<div class="detail-quick-item"><div class="dq-label">Co\u00fbt/jour</div><div class="dq-value" style="color:' + (costs.totalJour < 5 ? 'var(--green)' : costs.totalJour < 8 ? 'var(--yellow)' : 'var(--orange)') + '">' + costs.totalJour.toFixed(1) + '\u20ac</div></div>'
+        + '</div>';
+
+    html += '<div class="details-inner">';
+
+    // Pros
+    if (pc.pros.length > 0) {
+        html += '<div class="detail-section section-pros"><h4>\ud83d\udc4d Bonnes raisons</h4><ul class="reason-list">';
+        pc.pros.forEach(function(p) {
+            html += '<li class="reason-item pro' + (p.english ? ' english' : '') + '">'
+                + '<span class="reason-icon">' + p.icon + '</span>'
+                + '<span class="reason-text">' + escapeHtml(p.text) + (p.english ? '<span class="english-tag">Prof d\'anglais</span>' : '') + '</span></li>';
+        });
+        html += '</ul></div>';
+    }
+
+    // Cons
+    if (pc.cons.length > 0) {
+        html += '<div class="detail-section section-cons"><h4>\u26a0\ufe0f Points de vigilance</h4><ul class="reason-list">';
+        pc.cons.forEach(function(p) {
+            html += '<li class="reason-item con"><span class="reason-icon">' + p.icon + '</span><span class="reason-text">' + escapeHtml(p.text) + '</span></li>';
+        });
+        html += '</ul></div>';
+    }
+
+    // Trajets
+    html += '<div class="detail-section section-trajet"><h4>\ud83d\udee3\ufe0f Trajets</h4><div class="trajet-grid">'
+        + '<div class="trajet-item"><div class="trajet-label">Matin (arr. 8h)</div>'
+        + '<div class="trajet-value ' + getTimeClass(c.trajet_matin) + '">' + c.trajet_matin + ' min</div>'
+        + (c.trajet_matin_auto ? '<div class="trajet-sub">Autoroute : ' + c.trajet_matin_auto + ' min</div>' : '')
+        + '<div class="trajet-sub">D\u00e9part ' + formatDeparture(c.trajet_matin) + '</div></div>'
+        + '<div class="trajet-item"><div class="trajet-label">Soir (d\u00e9p. 17h)</div>'
+        + '<div class="trajet-value ' + getTimeClass(c.trajet_soir) + '">' + c.trajet_soir + ' min</div>'
+        + (c.trajet_soir_auto ? '<div class="trajet-sub">Autoroute : ' + c.trajet_soir_auto + ' min</div>' : '')
+        + '<div class="trajet-sub">Arriv\u00e9e ' + formatArrival(c.trajet_soir) + '</div></div>'
+        + '</div></div>';
+
+    // Costs
+    html += '<div class="detail-section section-couts"><h4>\ud83d\udcb0 Co\u00fbts de transport</h4>'
+        + '<div class="cost-row"><span class="label">Distance A/R</span><span class="value">' + costs.distAR + ' km</span></div>'
+        + '<div class="cost-row"><span class="label">Co\u00fbt A/R</span><span class="value">' + costs.totalJour.toFixed(1) + '\u20ac</span></div>';
+    if (c.peage_aller > 0) html += '<div class="cost-row"><span class="label">dont p\u00e9age/jour</span><span class="value" style="color:var(--orange)">' + costs.peageJour.toFixed(1) + '\u20ac</span></div>';
+    html += '<div class="cost-row"><span class="label">Budget mensuel</span><span class="value" style="color:var(--yellow)">' + costs.totalMois.toFixed(0) + '\u20ac</span></div>'
+        + '<div class="cost-row"><span class="label">Budget annuel</span><span class="value" style="color:' + (costs.totalAn < 1500 ? 'var(--green)' : costs.totalAn < 2500 ? 'var(--yellow)' : 'var(--orange)') + '">' + costs.totalAn.toFixed(0) + '\u20ac</span></div>';
+    if (c.rep) html += '<div class="rep-bonus">Prime REP : ~1 734\u20ac/an (ISS) + NBI 30 pts (~140\u20ac/mois brut)</div>';
+    html += '</div>';
+
+    // School info
+    html += '<div class="detail-section section-etab"><h4>\ud83c\udfeb \u00c9tablissement</h4>'
+        + '<div class="cost-row"><span class="label">Effectif</span><span class="value">' + c.effectif + ' \u00e9l\u00e8ves</span></div>'
+        + '<div class="cost-row"><span class="label">Mention TB</span><span class="value">' + c.mentionTB + '%</span></div>'
+        + '<div class="info-block"><div class="info-label">Axe routier</div><div class="info-value">' + escapeHtml(c.axe) + '</div></div>'
+        + '<div class="info-block"><div class="info-label">Options & dispositifs</div><div class="info-value">' + escapeHtml(c.options) + '</div></div>'
+        + '</div>';
+
+    // Notes
+    if (c.notes) {
+        html += '<div class="detail-section section-notes"><h4>\ud83d\udcdd Notes</h4>'
+            + '<div class="notes-text">' + escapeHtml(c.notes) + '</div>'
+            + '<div class="notes-text" style="margin-top:6px;font-style:italic">' + escapeHtml(c.reputation) + '</div>'
+            + '</div>';
+    }
+
+    // Links
+    html += '<div class="card-links">'
+        + '<a class="card-link" href="' + mapsLink(c) + '" target="_blank" rel="noopener">'
+        + '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>'
+        + 'Itin\u00e9raire</a>'
+        + '<a class="card-link" href="' + educNatLink(c) + '" target="_blank" rel="noopener">'
+        + '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>'
+        + '\u00c9ducation Nat.</a>'
+        + '<a class="card-link" href="' + collegeLyceeLink(c) + '" target="_blank" rel="noopener">'
+        + '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg>'
+        + 'Avis</a>'
+        + '<a class="card-link" href="' + villeDataLink(c) + '" target="_blank" rel="noopener">'
+        + '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>'
+        + 'Donn\u00e9es</a>'
+        + '</div>';
+
+    html += '</div>';
+    return html;
+}
+
 function renderCards() {
-    const filtered = getFilteredColleges();
-    const sorted = getSortedColleges(filtered);
-    const grid = document.getElementById('college-grid');
+    var filtered = getFilteredColleges();
+    var sorted = getSortedColleges(filtered);
+    var nonRef = sorted.filter(function(c) { return !c.isReference; });
+    var container = document.getElementById('cardsScroll');
 
-    // Calculate ranks for non-reference
-    const nonRef = sorted.filter(c => !c.isReference);
+    document.getElementById('resultCount').textContent = nonRef.length + ' coll\u00e8ges';
 
-    grid.innerHTML = sorted.map((c, i) => {
-        const costs = calculateCosts(c);
-        const score = calculateScore(c);
-        const rank = nonRef.indexOf(c) + 1;
-        const isTop3 = rank <= 3 && !c.isReference;
+    var allHtml = '';
+    sorted.forEach(function(c) {
+        var idx = colleges.indexOf(c);
+        var rank = nonRef.indexOf(c) + 1;
+        var isTop3 = rank <= 3 && rank > 0 && !c.isReference;
+        allHtml += buildCardHtml(c, idx, rank, isTop3);
+    });
 
-        return `
-        <div class="college-card ${isTop3 ? 'recommended top-pick' : ''} ${c.isReference ? 'comparison-ref' : ''}"
-             data-rank="${isTop3 ? (rank === 1 ? 'VOEU N°1' : rank === 2 ? 'VOEU N°2' : 'VOEU N°3') : ''}">
-            <div class="college-header">
-                <div>
-                    <span class="college-name">${c.nom}</span>
-                    ${c.isReference ? '<span class="current-badge">POSTE ACTUEL</span>' : ''}
-                    <div class="college-commune">${c.commune} — ${c.adresse}</div>
-                </div>
-                <div class="badges">
-                    ${c.rep ? (c.repPlus ? '<span class="badge badge-rep-plus">REP+</span>' : '<span class="badge badge-rep">REP</span>') : '<span class="badge badge-standard">Standard</span>'}
-                    ${c.segpa ? '<span class="badge badge-segpa">SEGPA</span>' : ''}
-                    ${c.ulis ? '<span class="badge badge-ulis">ULIS</span>' : ''}
-                </div>
-            </div>
+    container.innerHTML = allHtml;
 
-            <div class="metrics">
-                <div class="metric">
-                    <div class="metric-label">Effectif</div>
-                    <div class="metric-value">${c.effectif} élèves</div>
-                    <div class="metric-detail">${c.effectif < 600 ? 'Petit' : c.effectif < 800 ? 'Moyen' : 'Grand'} établissement</div>
-                </div>
-                <div class="metric">
-                    <div class="metric-label">Réussite Brevet</div>
-                    <div class="metric-value" style="color:${c.brevet >= 88 ? 'var(--green)' : c.brevet >= 80 ? 'var(--yellow)' : 'var(--orange)'}">${c.brevet}%</div>
-                    <div class="metric-detail">${c.mentionTB}% mention TB</div>
-                </div>
-                <div class="metric">
-                    <div class="metric-label">Distance</div>
-                    <div class="metric-value">${c.distance} km</div>
-                    <div class="metric-detail">${costs.distAR} km AR/jour</div>
-                </div>
-                <div class="metric">
-                    <div class="metric-label">Score global</div>
-                    <div class="metric-value" style="color:${getScoreColor(score)}">${score}/100</div>
-                    <div class="metric-detail">${score >= 80 ? 'Excellent' : score >= 65 ? 'Bon' : score >= 50 ? 'Moyen' : 'Difficile'}</div>
-                </div>
-            </div>
-
-            <div class="trajet-section">
-                <div class="trajet-box">
-                    <h4>Trajet MATIN (arrivée 8h)</h4>
-                    <div class="trajet-row">
-                        <span>Sans autoroute</span>
-                        <span class="trajet-time ${getTimeClass(c.trajet_matin)}">${c.trajet_matin} min</span>
-                    </div>
-                    ${c.trajet_matin_auto ? `<div class="trajet-row">
-                        <span>Avec autoroute</span>
-                        <span class="trajet-time ${getTimeClass(c.trajet_matin_auto)}">${c.trajet_matin_auto} min</span>
-                    </div>` : ''}
-                    <div class="trajet-row" style="font-size:0.8em;color:var(--muted)">
-                        <span>Départ estimé</span>
-                        <span>${formatDeparture(c.trajet_matin)} du matin</span>
-                    </div>
-                </div>
-                <div class="trajet-box">
-                    <h4>Trajet SOIR (départ 17h)</h4>
-                    <div class="trajet-row">
-                        <span>Sans autoroute</span>
-                        <span class="trajet-time ${getTimeClass(c.trajet_soir)}">${c.trajet_soir} min</span>
-                    </div>
-                    ${c.trajet_soir_auto ? `<div class="trajet-row">
-                        <span>Avec autoroute</span>
-                        <span class="trajet-time ${getTimeClass(c.trajet_soir_auto)}">${c.trajet_soir_auto} min</span>
-                    </div>` : ''}
-                    <div class="trajet-row" style="font-size:0.8em;color:var(--muted)">
-                        <span>Arrivée maison</span>
-                        <span>${formatArrival(c.trajet_soir)}</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="cost-section">
-                <h4>Coûts de transport ${c.autoroute ? '(option autoroute disponible)' : '(sans péage)'}</h4>
-                <div class="cost-grid">
-                    <div class="cost-item">
-                        <div class="cost-value">${costs.totalJour.toFixed(1)}€</div>
-                        <div class="cost-label">Coût A/R</div>
-                    </div>
-                    ${c.peage_aller > 0 ? `<div class="cost-item">
-                        <div class="cost-value">${costs.peageJour.toFixed(1)}€</div>
-                        <div class="cost-label">dont péage/j</div>
-                    </div>` : ''}
-                    <div class="cost-item">
-                        <div class="cost-value" style="color:var(--yellow)">${costs.totalMois.toFixed(0)}€</div>
-                        <div class="cost-label">Budget/mois</div>
-                    </div>
-                    <div class="cost-item">
-                        <div class="cost-value" style="color:${costs.totalAn < 1500 ? 'var(--green)' : costs.totalAn < 2500 ? 'var(--yellow)' : 'var(--orange)'}">${costs.totalAn.toFixed(0)}€</div>
-                        <div class="cost-label">Budget/an</div>
-                    </div>
-                </div>
-                ${c.rep ? `<div style="margin-top:8px;padding:8px;background:rgba(249,115,22,0.1);border-radius:6px;font-size:0.8em;">
-                    <strong style="color:var(--orange)">Prime REP :</strong> ~1 734€/an (ISS) + NBI 30 pts (~140€/mois brut) = <strong style="color:var(--green)">compense largement les frais de transport</strong>
-                </div>` : ''}
-            </div>
-
-            <div style="margin-top:12px;font-size:0.8em;color:var(--muted);padding:10px;background:rgba(255,255,255,0.02);border-radius:6px;">
-                <strong>Axe :</strong> ${c.axe}<br>
-                <strong>Avis :</strong> ${c.reputation}<br>
-                <strong>Spécificités :</strong> ${c.options}<br>
-                ${c.notes ? `<strong>Notes :</strong> ${c.notes}` : ''}
-            </div>
-
-            <div class="score-bar">
-                <div class="score-fill" style="width:${score}%;background:${getScoreColor(score)}"></div>
-            </div>
-        </div>`;
-    }).join('');
-
-    renderTable(sorted);
-    renderReco();
+    // Show/hide markers on the map
+    var filteredSet = new Set(filtered.map(function(c) { return colleges.indexOf(c); }));
+    colleges.forEach(function(c, i) {
+        if (!markers[i]) return;
+        if (filteredSet.has(i)) {
+            if (!map.hasLayer(markers[i])) map.addLayer(markers[i]);
+        } else {
+            if (map.hasLayer(markers[i])) map.removeLayer(markers[i]);
+        }
+    });
 }
 
-function formatDeparture(minutes) {
-    const h = 8 * 60 - minutes - 10; // 10 min de marge
-    return `${Math.floor(h/60)}h${String(h%60).padStart(2,'0')}`;
+function toggleCard(idx, event) {
+    if (event.target.closest('.compare-check') || event.target.closest('.card-link')) return;
+    if (expandedCard === idx) {
+        closeDetail();
+        return;
+    }
+    openDetailForIdx(idx);
 }
 
-function formatArrival(minutes) {
-    const h = 17 * 60 + minutes;
-    return `${Math.floor(h/60)}h${String(h%60).padStart(2,'0')}`;
+function closeDetail() {
+    expandedCard = null;
+    document.getElementById('detailPanel').classList.remove('visible');
+    document.getElementById('cardsScroll').style.display = '';
+    document.querySelector('.disclaimer').style.display = '';
+    zoomToAll();
 }
 
-function renderTable(sorted) {
-    const table = document.getElementById('compare-table');
-    table.innerHTML = `
-        <thead>
-            <tr>
-                <th>#</th>
-                <th>Collège</th>
-                <th>Commune</th>
-                <th>Effectif</th>
-                <th>Brevet</th>
-                <th>REP</th>
-                <th>Dist.</th>
-                <th>Matin</th>
-                <th>Soir</th>
-                <th>Péage/j</th>
-                <th>Coût A/R</th>
-                <th>Budget/mois</th>
-                <th>Budget/an</th>
-                <th>Score</th>
-            </tr>
-        </thead>
-        <tbody>
-            ${sorted.map((c, i) => {
-                const costs = calculateCosts(c);
-                const score = calculateScore(c);
-                return `<tr style="${c.isReference ? 'background:rgba(239,68,68,0.08);' : ''}">
-                    <td>${c.isReference ? 'REF' : i+1}</td>
-                    <td style="text-align:left;font-weight:600;">${c.nom}</td>
-                    <td>${c.commune}</td>
-                    <td>${c.effectif}</td>
-                    <td><span class="${getTimeClass(100-c.brevet)}">${c.brevet}%</span></td>
-                    <td>${c.rep ? '<span style="color:var(--orange);font-weight:700">REP</span>' : '—'}</td>
-                    <td>${c.distance} km</td>
-                    <td><span class="${getTimeClass(c.trajet_matin)}">${c.trajet_matin} min</span></td>
-                    <td><span class="${getTimeClass(c.trajet_soir)}">${c.trajet_soir} min</span></td>
-                    <td>${c.peage_aller > 0 ? (c.peage_aller*2).toFixed(1)+'€' : '—'}</td>
-                    <td>${costs.totalJour.toFixed(1)}€</td>
-                    <td>${costs.totalMois.toFixed(0)}€</td>
-                    <td>${costs.totalAn.toFixed(0)}€</td>
-                    <td style="font-weight:700;color:${getScoreColor(score)}">${score}</td>
-                </tr>`;
-            }).join('')}
-        </tbody>`;
+function toggleCompare(idx, event) {
+    event.stopPropagation();
+    if (selectedCompare.has(idx)) {
+        selectedCompare.delete(idx);
+    } else if (selectedCompare.size < 4) {
+        selectedCompare.add(idx);
+    }
+    updateCompareBar();
+    renderCards();
 }
 
-function renderReco() {
-    const sorted = getSortedColleges(colleges.filter(c => !c.isReference));
-    const top = sorted.slice(0, 8);
-    const reco = document.getElementById('reco-content');
-
-    reco.innerHTML = `
-        <div class="summary-section" style="border:none;padding:0;">
-            <h2>Recommandation de classement des voeux</h2>
-            <p style="color:var(--muted);margin-bottom:16px;font-size:0.9em;">
-                Classement basé sur l'équilibre trajet/qualité de vie/qualité d'établissement.
-                Le score pondère : temps de trajet (40%), coût transport (20%), résultats scolaires (15%),
-                confort de route (15%), taille établissement (10%).
-            </p>
-
-            ${top.map((c, i) => {
-                const score = calculateScore(c);
-                const costs = calculateCosts(c);
-                return `<div class="voeu-item">
-                    <div class="voeu-rank ${i < 3 ? 'voeu-'+(i+1) : 'voeu-other'}">${i+1}</div>
-                    <div class="voeu-info">
-                        <div class="voeu-name">${c.nom} — ${c.commune} ${c.rep ? '(REP)' : ''}</div>
-                        <div class="voeu-reason">
-                            ${c.trajet_matin} min matin / ${c.trajet_soir} min soir · ${c.distance} km ·
-                            Brevet ${c.brevet}% · <strong>${costs.totalJour.toFixed(1)}€/A-R</strong> · ${costs.totalMois.toFixed(0)}€/mois · ${costs.totalAn.toFixed(0)}€/an
-                            ${c.peage_aller > 0 ? ' · Péage ' + (c.peage_aller*2).toFixed(1) + '€/j' : ' · Sans péage'}
-                            ${c.rep ? ' · Prime REP ~1734€/an' : ''}
-                        </div>
-                    </div>
-                    <div class="voeu-score" style="color:${getScoreColor(score)}">${score}</div>
-                </div>`;
-            }).join('')}
-
-            <div style="margin-top:20px;padding:16px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:8px;">
-                <h3 style="color:var(--green);margin-bottom:8px;">Analyse et conseils</h3>
-                <ul style="font-size:0.85em;color:var(--muted);padding-left:20px;">
-                    <li><strong>Voeu 1-3 : Boège / St-Jeoire / Reignier</strong> — Les meilleurs compromis : très proches (9-14 km), routes fluides, excellents résultats. Le gain de temps par rapport à St-Julien est spectaculaire (12-18 min vs 35-45 min).</li>
-                    <li><strong>Voeu 4-5 : Karine Ruby (St-Pierre) / Les Allobroges (La Roche)</strong> — Excellentes alternatives, un peu plus loin mais routes sans bouchons. La Roche-sur-Foron est une ville agréable avec de bons résultats.</li>
-                    <li><strong>Direction vallée de l'Arve (Bonneville, Marignier, Cluses)</strong> — Route fluide (D1205) même sans autoroute. Possibilité A40 si budget le permet. Bons établissements.</li>
-                    <li><strong>Éviter la zone Annemasse/Gaillard pour le trajet</strong> — Sauf si l'intérêt REP (Michel Servet) est stratégique pour les points de mutation future. Les bouchons du soir (17h) y sont très pénalisants.</li>
-                    <li><strong>Thonon / Douvaine</strong> — Trop loin pour un gain réel vs St-Julien. Uniquement si souhait de cadre lac Léman.</li>
-                    <li><strong>Stratégie REP :</strong> Si vous visez des points de mutation pour plus tard, Michel Servet (Annemasse) offre un bon compromis REP (prime + bonif.) avec un trajet certes chargé le soir mais sans péage.</li>
-                </ul>
-            </div>
-
-            <div style="margin-top:16px;padding:16px;background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);border-radius:8px;">
-                <h3 style="color:var(--blue);margin-bottom:8px;">Comparaison avec le poste actuel (St-Julien)</h3>
-                <table style="width:100%;font-size:0.8em;border-collapse:collapse;">
-                    <tr>
-                        <td style="padding:6px;border-bottom:1px solid var(--border);"></td>
-                        <td style="padding:6px;border-bottom:1px solid var(--border);color:var(--red);font-weight:700;">St-Julien (actuel)</td>
-                        <td style="padding:6px;border-bottom:1px solid var(--border);color:var(--green);font-weight:700;">Voeu 1 proposé</td>
-                        <td style="padding:6px;border-bottom:1px solid var(--border);font-weight:700;">Gain</td>
-                    </tr>
-                    <tr>
-                        <td style="padding:6px;">Trajet matin</td>
-                        <td style="padding:6px;color:var(--red);">35 min</td>
-                        <td style="padding:6px;color:var(--green);">${top[0].trajet_matin} min</td>
-                        <td style="padding:6px;color:var(--green);font-weight:700;">-${35-top[0].trajet_matin} min</td>
-                    </tr>
-                    <tr>
-                        <td style="padding:6px;">Trajet soir</td>
-                        <td style="padding:6px;color:var(--red);">45 min</td>
-                        <td style="padding:6px;color:var(--green);">${top[0].trajet_soir} min</td>
-                        <td style="padding:6px;color:var(--green);font-weight:700;">-${45-top[0].trajet_soir} min</td>
-                    </tr>
-                    <tr>
-                        <td style="padding:6px;">Temps route/jour</td>
-                        <td style="padding:6px;color:var(--red);">1h20</td>
-                        <td style="padding:6px;color:var(--green);">${top[0].trajet_matin+top[0].trajet_soir} min</td>
-                        <td style="padding:6px;color:var(--green);font-weight:700;">-${80-(top[0].trajet_matin+top[0].trajet_soir)} min/jour</td>
-                    </tr>
-                    <tr>
-                        <td style="padding:6px;">Coût annuel</td>
-                        <td style="padding:6px;">${calculateCosts(colleges.find(c => c.nom.includes('actuel'))).totalAn.toFixed(0)}€</td>
-                        <td style="padding:6px;">${calculateCosts(top[0]).totalAn.toFixed(0)}€</td>
-                        <td style="padding:6px;color:var(--green);font-weight:700;">-${(calculateCosts(colleges.find(c => c.nom.includes('actuel'))).totalAn - calculateCosts(top[0]).totalAn).toFixed(0)}€</td>
-                    </tr>
-                    <tr>
-                        <td style="padding:6px;">Bouchons</td>
-                        <td style="padding:6px;color:var(--red);">Chroniques (Genève)</td>
-                        <td style="padding:6px;color:var(--green);">Rares/absents</td>
-                        <td style="padding:6px;">Confort ++</td>
-                    </tr>
-                </table>
-            </div>
-        </div>`;
+function updateCompareBar() {
+    var bar = document.getElementById('compareBar');
+    document.getElementById('compareCount').textContent = selectedCompare.size;
+    bar.classList.toggle('visible', selectedCompare.size >= 2);
 }
 
-function switchTab(tab) {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-    document.querySelector(`.tab[onclick="switchTab('${tab}')"]`).classList.add('active');
-    document.getElementById('tab-' + tab).classList.add('active');
-    if (tab === 'reco') renderReco();
+function clearCompare() {
+    selectedCompare.clear();
+    updateCompareBar();
+    renderCards();
 }
 
-// Initial render
+function openCompare() {
+    var indices = Array.from(selectedCompare);
+    var items = indices.map(function(i) { return colleges[i]; });
+    if (items.length < 2) return;
+
+    var rows = [
+        { label: 'Commune', fn: function(c) { return c.commune; } },
+        { label: 'Score', fn: function(c) { return calculateScore(c); }, best: 'max' },
+        { label: 'Trajet matin', fn: function(c) { return c.trajet_matin; }, best: 'min', unit: ' min' },
+        { label: 'Trajet soir', fn: function(c) { return c.trajet_soir; }, best: 'min', unit: ' min' },
+        { label: 'Distance', fn: function(c) { return c.distance; }, best: 'min', unit: ' km' },
+        { label: 'Brevet', fn: function(c) { return c.brevet; }, best: 'max', unit: '%' },
+        { label: 'Mention TB', fn: function(c) { return c.mentionTB; }, best: 'max', unit: '%' },
+        { label: 'Effectif', fn: function(c) { return c.effectif; } },
+        { label: 'Co\u00fbt A/R', fn: function(c) { return calculateCosts(c).totalJour.toFixed(1); }, best: 'min', unit: '\u20ac' },
+        { label: 'Budget/mois', fn: function(c) { return calculateCosts(c).totalMois.toFixed(0); }, best: 'min', unit: '\u20ac' },
+        { label: 'Budget/an', fn: function(c) { return calculateCosts(c).totalAn.toFixed(0); }, best: 'min', unit: '\u20ac' },
+        { label: 'P\u00e9age/jour', fn: function(c) { return c.peage_aller > 0 ? (c.peage_aller * 2).toFixed(1) + '\u20ac' : '\u2014'; } },
+        { label: 'REP', fn: function(c) { return c.rep ? 'Oui' : '\u2014'; } }
+    ];
+
+    var gridCols = '200px repeat(' + items.length + ', 1fr)';
+    var html = '<div class="compare-grid">';
+
+    html += '<div class="compare-row header-row" style="grid-template-columns:' + gridCols + '">'
+        + '<div class="compare-cell"></div>';
+    items.forEach(function(c) {
+        html += '<div class="compare-cell">' + escapeHtml(c.nom.replace('Coll\u00e8ge ', '')) + '</div>';
+    });
+    html += '</div>';
+
+    rows.forEach(function(row) {
+        var values = items.map(function(c) { return row.fn(c); });
+        var numValues = values.map(function(v) { return parseFloat(v); }).filter(function(v) { return !isNaN(v); });
+        var bestVal = null;
+        if (row.best === 'min' && numValues.length > 0) bestVal = Math.min.apply(null, numValues);
+        if (row.best === 'max' && numValues.length > 0) bestVal = Math.max.apply(null, numValues);
+
+        html += '<div class="compare-row" style="grid-template-columns:' + gridCols + '">'
+            + '<div class="compare-cell">' + row.label + '</div>';
+        values.forEach(function(v) {
+            var num = parseFloat(v);
+            var isBest = bestVal !== null && num === bestVal && numValues.filter(function(n) { return n === bestVal; }).length === 1;
+            var unit = row.unit || '';
+            var display = typeof v === 'number' ? v + unit : v;
+            html += '<div class="compare-cell' + (isBest ? ' best' : '') + '">' + display + '</div>';
+        });
+        html += '</div>';
+    });
+
+    html += '</div>';
+
+    document.getElementById('compareContent').innerHTML = html;
+    document.getElementById('compareModal').classList.add('open');
+}
+
+function closeCompare() {
+    document.getElementById('compareModal').classList.remove('open');
+}
+
+initMap();
 renderCards();
+
+// Hide loading screen
+setTimeout(function() {
+    document.getElementById('loadingScreen').classList.add('hidden');
+}, 2000);
 </script>
 
 </body>
